@@ -43,3 +43,17 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# ---------------------------------------------------------------------------
+# Release signing - NEVER commit these.
+#
+# android/key.properties holds the keystore passwords in plain text, and the
+# .jks is the upload key itself. Play does not allow re-signing an existing
+# package name with a new key, so leaking these permanently bricks the
+# release identity for com.the356company.pagelit. Keep an offline backup.
+# ---------------------------------------------------------------------------
+/android/key.properties
+*.jks
+*.keystore
+*.p12
+*.pem
