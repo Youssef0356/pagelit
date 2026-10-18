@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import '../services/premium_service.dart';
 import 'ad_ids.dart';
 
 /// A responsive anchored adaptive banner shown at the bottom of every screen.
@@ -20,9 +21,36 @@ class _AdBannerState extends State<AdBanner> {
   bool _loading = false;
 
   @override
+  void initState() {
+    super.initState();
+    PremiumService.isPremium.addListener(_onPremiumChanged);
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_ad == null && !_loading) _load();
+    if (_ad == null && !_loading && !PremiumService.isPremium.value) _load();
+  }
+
+  /// The premium state flipped. Granted: drop the live ad immediately so it
+  /// stops being displayed and never loads again. Revoked (debug preview
+  /// only — real purchases are permanent): start requesting ads again.
+  void _onPremiumChanged() {
+    if (!mounted) return;
+    if (PremiumService.isPremium.value) {
+      final ad = _ad;
+      _ad = null;
+      _loaded = false;
+      _loading = false;
+      if (ad != null) {
+        // The AdWidget is still attached this frame (the build rebuild
+        // removes it in the same pass); dispose after the frame so the ad
+        // is never released while on screen.
+        WidgetsBinding.instance.addPostFrameCallback((_) => ad.dispose());
+      }
+    } else if (_ad == null && !_loading) {
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -54,9 +82,9 @@ class _AdBannerState extends State<AdBanner> {
         ),
       );
       await ad.load();
-      if (!mounted) {
-        // Disposed while the ad was loading: dispose() already ran with a
-        // null _ad, so release the ad here instead of leaking it.
+      if (!mounted || PremiumService.isPremium.value) {
+        // Disposed, or the user turned premium while this ad was loading:
+        // dispose() only covers a stored _ad, so release it here instead.
         if (!failed) ad.dispose();
         return;
       }
@@ -69,18 +97,26 @@ class _AdBannerState extends State<AdBanner> {
 
   @override
   void dispose() {
+    PremiumService.isPremium.removeListener(_onPremiumChanged);
     _ad?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final ad = _ad;
-    if (!_loaded || ad == null) return const SizedBox.shrink();
-    return SizedBox(
-      width: ad.size.width.toDouble(),
-      height: ad.size.height.toDouble(),
-      child: AdWidget(ad: ad),
+    // Renders nothing (zero height) for premium users and while loading,
+    // so the surrounding layout never shifts.
+    return ValueListenableBuilder<bool>(
+      valueListenable: PremiumService.isPremium,
+      builder: (context, premium, _) {
+        final ad = _ad;
+        if (premium || !_loaded || ad == null) return const SizedBox.shrink();
+        return SizedBox(
+          width: ad.size.width.toDouble(),
+          height: ad.size.height.toDouble(),
+          child: AdWidget(ad: ad),
+        );
+      },
     );
   }
 }

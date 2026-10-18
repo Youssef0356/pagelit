@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/premium_service.dart';
 import '../services/reading_prefs.dart';
 import '../services/reading_progress.dart';
 import '../services/recent_files.dart';
@@ -154,6 +156,7 @@ class SettingsScreen extends StatelessWidget {
               onTap: () => _confirmClearData(context),
             ),
           ),
+          const _PremiumSection(),
           const _AboutSection(),
         ],
       ),
@@ -251,6 +254,144 @@ class _ChoiceRow<T> extends StatelessWidget {
       selected: {value},
       showSelectedIcon: false,
       onSelectionChanged: (selection) => onChanged(selection.first),
+    );
+  }
+}
+
+/// "Remove ads" — a one-time Play Billing purchase (see PremiumService).
+///
+/// Tapping the row opens the Google Play purchase sheet; once the purchase
+/// (or a restore) completes, every AdBanner in the app disappears at once
+/// through [PremiumService.isPremium].
+class _PremiumSection extends StatefulWidget {
+  const _PremiumSection();
+
+  @override
+  State<_PremiumSection> createState() => _PremiumSectionState();
+}
+
+class _PremiumSectionState extends State<_PremiumSection> {
+  @override
+  void initState() {
+    super.initState();
+    PremiumService.lastError.addListener(_onError);
+  }
+
+  @override
+  void dispose() {
+    PremiumService.lastError.removeListener(_onError);
+    super.dispose();
+  }
+
+  void _onError() {
+    final message = PremiumService.lastError.value;
+    PremiumService.lastError.value = null;
+    if (message == null || !mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _buy() async {
+    final started = await PremiumService.buy();
+    if (started || !mounted) return;
+    // buy() only returns false here when billing is unusable on this
+    // device (no Play Store / product not published yet) or already busy.
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          PremiumService.priceLabel.value == null
+              ? 'Purchases are not available on this device.'
+              : 'Could not start the purchase. Please try again.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _restore() async {
+    final outcome = await PremiumService.restore();
+    if (!mounted) return;
+    // `granted` flips the section to its thank-you state; `failed` was
+    // already surfaced through the lastError listener.
+    if (outcome == RestoreOutcome.notFound) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No previous purchase found.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return _Section(
+      label: 'PREMIUM',
+      child: ValueListenableBuilder<bool>(
+        valueListenable: PremiumService.isPremium,
+        builder: (context, premium, _) => Column(
+          children: [
+            ValueListenableBuilder<bool>(
+              valueListenable: PremiumService.isBuying,
+              builder: (context, buying, _) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  premium
+                      ? Icons.verified_outlined
+                      : Icons.workspace_premium_outlined,
+                  color: colorScheme.primary,
+                ),
+                title: const Text('Remove ads'),
+                subtitle: premium
+                    ? const Text('Thank you! Ads are off everywhere.')
+                    : ValueListenableBuilder<String?>(
+                        valueListenable: PremiumService.priceLabel,
+                        builder: (context, price, _) => Text(
+                          price == null
+                              ? 'One-time purchase'
+                              : 'One-time purchase · $price',
+                        ),
+                      ),
+                trailing: premium
+                    ? Icon(Icons.check_circle_rounded, color: colorScheme.primary)
+                    : buying
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      )
+                    : Icon(
+                        Icons.chevron_right_rounded,
+                        color: colorScheme.outline,
+                      ),
+                onTap: premium || buying ? null : _buy,
+              ),
+            ),
+            if (!premium)
+              Align(
+                alignment: Alignment.centerRight,
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: PremiumService.isBuying,
+                  builder: (context, buying, _) => TextButton(
+                    onPressed: buying ? null : _restore,
+                    child: const Text('Restore purchases'),
+                  ),
+                ),
+              ),
+            if (kDebugMode) ...[
+              const Divider(height: 28),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Simulate premium (debug)'),
+                subtitle: const Text(
+                  'Preview the ad-free UI — not saved, resets on restart',
+                ),
+                value: premium,
+                onChanged: PremiumService.debugSetPremium,
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

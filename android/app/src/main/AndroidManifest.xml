@@ -42,10 +42,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-        <!-- Google Mobile Ads App ID (shared across the356company apps) -->
+        <!-- Google Mobile Ads App ID (Pagelit) -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-6774620515484669~7693006342"/>
+            android:value="ca-app-pub-6774620515484669~9581232659"/>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
