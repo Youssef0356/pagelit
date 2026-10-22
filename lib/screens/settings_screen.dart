@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/device_pdfs.dart';
 import '../services/premium_service.dart';
 import '../services/reading_prefs.dart';
 import '../services/reading_progress.dart';
@@ -16,12 +17,205 @@ const _privacyUrl = 'https://the356company.github.io/pagelit/privacy.html';
 
 /// App settings: appearance, reading behaviour, annotation defaults, stored
 /// data and about info. Everything here is also reachable from the reader.
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  int _cacheSizeBytes = 0;
+  List<String> _folders = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStorageInfo();
+  }
+
+  Future<void> _loadStorageInfo() async {
+    final size = await DevicePdfLibrary.getCacheSize();
+    final folders = await DevicePdfLibrary.loadFolders();
+    if (mounted) {
+      setState(() {
+        _cacheSizeBytes = size;
+        _folders = folders;
+      });
+    }
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    var value = bytes.toDouble();
+    var unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+      value /= 1024;
+      unit++;
+    }
+    final digits = unit == 0 || value >= 100 ? 0 : 1;
+    return '${value.toStringAsFixed(digits)} ${units[unit]}';
+  }
+
+  Future<void> _manageFolders() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.folder_open_rounded, size: 22),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Scanned Folders',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: 'Add folder',
+                      icon: const Icon(Icons.create_new_folder_outlined),
+                      onPressed: () async {
+                        await DevicePdfLibrary.addFolder();
+                        final updated = await DevicePdfLibrary.loadFolders();
+                        setSheetState(() => _folders = updated);
+                        await _loadStorageInfo();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              if (_folders.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(
+                    child: Text(
+                      'No custom folders added yet.\nTap the + button to select a folder.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _folders.length,
+                    itemBuilder: (context, index) {
+                      final uri = _folders[index];
+                      final decoded = Uri.decodeComponent(uri.split('/').last);
+                      return ListTile(
+                        leading: const Icon(Icons.folder_rounded),
+                        title: Text(
+                          decoded.isEmpty ? uri : decoded,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          uri,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        trailing: IconButton(
+                          tooltip: 'Remove folder',
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          onPressed: () async {
+                            await DevicePdfLibrary.removeFolder(uri);
+                            final updated = await DevicePdfLibrary.loadFolders();
+                            setSheetState(() => _folders = updated);
+                            await _loadStorageInfo();
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await _loadStorageInfo();
+  }
+
+  Future<void> _clearCache() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear cached files?'),
+        content: const Text(
+          'This will remove temporary copies of documents opened from other apps (WhatsApp, Downloads, Drive). '
+          'Your original files on device are not deleted.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await DevicePdfLibrary.clearCache();
+    await _loadStorageInfo();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Document cache cleared')),
+    );
+  }
+
+  Future<void> _confirmClearData(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear recents?'),
+        content: const Text(
+          'This removes your recent files list, cached documents, and every saved reading position. '
+          'Your original documents are not deleted.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final paths = (await RecentFilesStore.load())
+        .map((file) => file.path)
+        .toList();
+    await RecentFilesStore.clear();
+    await ReadingProgress.removeAll(paths);
+    await DevicePdfLibrary.clearCache();
+    await _loadStorageInfo();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Recents, cache, and progress cleared')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
@@ -73,20 +267,27 @@ class SettingsScreen extends StatelessWidget {
                     onChanged: ReadingPrefs.setLayoutMode,
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Applies the next time a document is opened.',
-                      style: text.bodySmall,
-                    ),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Scroll direction', style: text.titleSmall),
+                ),
+                const SizedBox(height: 10),
+                ValueListenableBuilder<PdfScrollDirection>(
+                  valueListenable: ReadingPrefs.scrollDirection,
+                  builder: (context, dir, _) => _ChoiceRow<PdfScrollDirection>(
+                    value: dir,
+                    options: const {
+                      PdfScrollDirection.vertical: 'Vertical',
+                      PdfScrollDirection.horizontal: 'Horizontal',
+                    },
+                    onChanged: ReadingPrefs.setScrollDirection,
                   ),
                 ),
                 const SizedBox(height: 18),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('Comfort', style: text.titleSmall),
+                  child: Text('Comfort & Night mode', style: text.titleSmall),
                 ),
                 const SizedBox(height: 10),
                 ValueListenableBuilder<ComfortMode>(
@@ -97,6 +298,7 @@ class SettingsScreen extends StatelessWidget {
                       ComfortMode.normal: 'Normal',
                       ComfortMode.sepia: 'Sepia',
                       ComfortMode.dim: 'Dim',
+                      ComfortMode.inverted: 'Night',
                     },
                     onChanged: ReadingPrefs.setComfortMode,
                   ),
@@ -127,10 +329,8 @@ class SettingsScreen extends StatelessWidget {
                             shape: BoxShape.circle,
                             border: Border.all(
                               color: color.toARGB32() == swatch.toARGB32()
-                                  ? Theme.of(context).colorScheme.onSurface
-                                  : Theme.of(
-                                      context,
-                                    ).colorScheme.outlineVariant,
+                                  ? scheme.onSurface
+                                  : scheme.outlineVariant,
                               width: color.toARGB32() == swatch.toARGB32()
                                   ? 2.5
                                   : 1,
@@ -144,57 +344,46 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           _Section(
-            label: 'DATA',
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                Icons.delete_outline_rounded,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              title: const Text('Clear recents and progress'),
-              subtitle: const Text('Removes the list and reading positions'),
-              onTap: () => _confirmClearData(context),
+            label: 'STORAGE & FOLDERS',
+            child: Column(
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.folder_special_outlined),
+                  title: const Text('Scanned folders'),
+                  subtitle: Text(
+                    _folders.isEmpty
+                        ? 'No custom folders selected'
+                        : '${_folders.length} custom folder${_folders.length == 1 ? '' : 's'} scanned',
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: _manageFolders,
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.cleaning_services_outlined),
+                  title: const Text('Clear shared document cache'),
+                  subtitle: Text('Temporary copies: ${_formatSize(_cacheSizeBytes)}'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: _cacheSizeBytes > 0 ? _clearCache : null,
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    Icons.delete_outline_rounded,
+                    color: scheme.primary,
+                  ),
+                  title: const Text('Clear recents and progress'),
+                  subtitle: const Text('Removes the list and reading positions'),
+                  onTap: () => _confirmClearData(context),
+                ),
+              ],
             ),
           ),
           const _PremiumSection(),
           const _AboutSection(),
         ],
       ),
-    );
-  }
-
-  Future<void> _confirmClearData(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear recents?'),
-        content: const Text(
-          'This removes your recent files list and every saved reading position. '
-          'Your PDFs are not deleted.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Clear'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    // Read the list before clearing it: the paths are what we need to purge
-    // the stored reading positions.
-    final paths = (await RecentFilesStore.load())
-        .map((file) => file.path)
-        .toList();
-    await RecentFilesStore.clear();
-    await ReadingProgress.removeAll(paths);
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Recents and progress cleared')),
     );
   }
 }
@@ -249,7 +438,7 @@ class _ChoiceRow<T> extends StatelessWidget {
     return SegmentedButton<T>(
       segments: [
         for (final entry in options.entries)
-          ButtonSegment<T>(value: entry.key, label: Text(entry.value)),
+          ButtonSegment<T>(value: entry.key, label: Text(entry.value, style: const TextStyle(fontSize: 12))),
       ],
       selected: {value},
       showSelectedIcon: false,
@@ -259,10 +448,6 @@ class _ChoiceRow<T> extends StatelessWidget {
 }
 
 /// "Remove ads" — a one-time Play Billing purchase (see PremiumService).
-///
-/// Tapping the row opens the Google Play purchase sheet; once the purchase
-/// (or a restore) completes, every AdBanner in the app disappears at once
-/// through [PremiumService.isPremium].
 class _PremiumSection extends StatefulWidget {
   const _PremiumSection();
 
@@ -295,8 +480,6 @@ class _PremiumSectionState extends State<_PremiumSection> {
   Future<void> _buy() async {
     final started = await PremiumService.buy();
     if (started || !mounted) return;
-    // buy() only returns false here when billing is unusable on this
-    // device (no Play Store / product not published yet) or already busy.
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -311,8 +494,6 @@ class _PremiumSectionState extends State<_PremiumSection> {
   Future<void> _restore() async {
     final outcome = await PremiumService.restore();
     if (!mounted) return;
-    // `granted` flips the section to its thank-you state; `failed` was
-    // already surfaced through the lastError listener.
     if (outcome == RestoreOutcome.notFound) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No previous purchase found.')),
@@ -458,3 +639,4 @@ class _AboutSectionState extends State<_AboutSection> {
     }
   }
 }
+

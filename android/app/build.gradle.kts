@@ -71,3 +71,8 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Scans user-chosen folders (Storage Access Framework) for PDFs.
+    implementation("androidx.documentfile:documentfile:1.0.1")
+}

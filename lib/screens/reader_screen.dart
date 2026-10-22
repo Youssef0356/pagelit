@@ -9,10 +9,13 @@ import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../ads/ad_banner.dart';
+import '../services/device_pdfs.dart';
 import '../services/reading_prefs.dart';
 import '../services/reading_progress.dart';
 import '../theme/app_theme.dart';
@@ -30,12 +33,10 @@ const _annotationPalette = [
   Colors.red,
 ];
 
-/// Tool button size. 48px is Material's minimum comfortable touch target, and
-/// six of them still fit a 360dp-wide card with gaps to aim at.
+/// Tool button size. 48px is Material's minimum comfortable touch target.
 const _toolButtonSize = 48.0;
 
-/// The PDF reader: viewing, annotating (highlight/underline/strikethrough/
-/// squiggly/comment), sharing and saving pages to the gallery.
+/// The PDF reader: viewing, annotating, sharing and saving pages to the gallery.
 class ReaderScreen extends StatefulWidget {
   const ReaderScreen({super.key, required this.filePath, required this.title});
 
@@ -65,6 +66,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool _isLoaded = false;
   bool _isBusy = false;
   bool _isSearchOpen = false;
+  int _quarterTurns = 0;
+  String? _password;
+  PdfBookmarkBase? _bookmarks;
 
   /// Annotation currently selected in pan mode (offered for recolour/delete).
   Annotation? _selectedAnnotation;
@@ -84,47 +88,146 @@ class _ReaderScreenState extends State<ReaderScreen> {
     Colors.red,
   ];
 
-  /// Built once and never rebuilt by parent [setState] calls — the viewer is
-  /// the most expensive subtree on this screen, and rebuilding it on every
-  /// page change / search tick / annotation would be pure waste.
-  late final SfPdfViewer _viewer = SfPdfViewer.file(
-    File(widget.filePath),
-    controller: _controller,
-    // Applied at open time: changing the layout later would rebuild the
-    // viewer and lose in-session annotations, so Settings says as much.
-    pageLayoutMode: ReadingPrefs.layoutMode.value,
-    onDocumentLoaded: (details) {
-      _controller.annotationSettings.author = 'Pagelit';
-      _applyColorToSettings(_color);
-      setState(() {
-        _isLoaded = true;
-        _pageCount = _controller.pageCount;
-      });
-      _restorePosition();
-    },
-    onDocumentLoadFailed: (details) {
-      if (!mounted) return;
+  late SfPdfViewer _viewer;
+
+  void _initViewer() {
+    _viewer = SfPdfViewer.file(
+      File(widget.filePath),
+      key: ValueKey('viewer_${widget.filePath}_${_password ?? ""}_${ReadingPrefs.scrollDirection.value}'),
+      controller: _controller,
+      password: _password,
+      pageLayoutMode: ReadingPrefs.layoutMode.value,
+      scrollDirection: ReadingPrefs.scrollDirection.value,
+      onDocumentLoaded: (details) {
+        _controller.annotationSettings.author = 'Pagelit';
+        _applyColorToSettings(_color);
+        _bookmarks = details.document.bookmarks;
+        setState(() {
+          _isLoaded = true;
+          _pageCount = _controller.pageCount;
+        });
+        _restorePosition();
+      },
+      onDocumentLoadFailed: _handleLoadFailed,
+      onHyperlinkClicked: (details) async {
+        final raw = details.uri;
+        final uri = Uri.tryParse(raw);
+        if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https' || uri.scheme == 'mailto')) {
+          try {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } catch (_) {}
+        }
+      },
+      onPageChanged: (details) {
+        setState(() => _pageNumber = details.newPageNumber);
+        _scheduleProgressSave();
+      },
+      onAnnotationAdded: _onAnnotationAdded,
+      onAnnotationRemoved: _onAnnotationRemoved,
+      onAnnotationSelected: _onAnnotationSelected,
+      onAnnotationDeselected: _onAnnotationDeselected,
+    );
+  }
+
+  void _handleLoadFailed(PdfDocumentLoadFailedDetails details) {
+    if (!mounted) return;
+    final err = details.error.toLowerCase();
+    if (err.contains('password') || err.contains('protect') || err.contains('encrypt')) {
+      _promptPassword();
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Could not open PDF: ${details.error}')),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
+  Future<void> _promptPassword() async {
+    final passwordController = TextEditingController();
+    final entered = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Password Protected'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('This document is encrypted. Enter password to open:'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: passwordController,
+              autofocus: true,
+              obscureText: true,
+              decoration: const InputDecoration(
+                hintText: 'Password',
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: (val) => Navigator.of(context).pop(val),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(passwordController.text),
+            child: const Text('Unlock'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (entered == null || entered.isEmpty) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() {
+      _password = entered;
+      _isLoaded = false;
+      _initViewer();
+    });
+  }
+
+  void _openBookmarksSheet() {
+    if (_bookmarks == null || _bookmarks!.count == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open PDF: ${details.error}')),
+        const SnackBar(content: Text('This document has no table of contents.')),
       );
-      // Don't leave the user staring at a blank reader.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) Navigator.of(context).pop();
-      });
-    },
-    onPageChanged: (details) {
-      setState(() => _pageNumber = details.newPageNumber);
-      _scheduleProgressSave();
-    },
-    onAnnotationAdded: _onAnnotationAdded,
-    onAnnotationRemoved: _onAnnotationRemoved,
-    onAnnotationSelected: _onAnnotationSelected,
-    onAnnotationDeselected: _onAnnotationDeselected,
-  );
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => _OutlineSheet(
+        bookmarks: _bookmarks!,
+        onSelect: (bm) => _controller.jumpToBookmark(bm),
+      ),
+    );
+  }
+
+  void _rotateClockwise() {
+    HapticFeedback.selectionClick();
+    setState(() => _quarterTurns = (_quarterTurns + 1) % 4);
+  }
+
+  Future<void> _printDocument() async {
+    final ok = await DevicePdfLibrary.printFile(widget.filePath);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Printing is not supported on this device.')),
+      );
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _initViewer();
     ReadingPrefs.keepScreenOn.addListener(_applyKeepScreenOn);
     _applyKeepScreenOn();
   }
@@ -133,8 +236,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void dispose() {
     ReadingPrefs.keepScreenOn.removeListener(_applyKeepScreenOn);
     unawaited(WakelockPlus.disable());
+    if (_immersive) {
+      unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+    }
     _progressDebounce?.cancel();
-    _saveProgress(); // Persist the final position on exit.
+    _saveProgress();
     _commentInput.dispose();
     _searchFieldController.dispose();
     _jumpInput.dispose();
@@ -142,7 +248,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
     super.dispose();
   }
 
-  /// "Keep screen on" only applies while a document is actually open.
   void _applyKeepScreenOn() {
     if (ReadingPrefs.keepScreenOn.value) {
       unawaited(WakelockPlus.enable());
@@ -172,7 +277,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
   }
 
-  /// Jump-to-page prompt, opened by tapping the page pill in the app bar.
   Future<void> _promptJumpToPage() async {
     if (!_isLoaded || _pageCount <= 1) return;
     _jumpInput.text = '$_pageNumber';
@@ -272,8 +376,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (_isLoaded) _applyColorToSettings(color);
   }
 
-  /// Applies the palette color to every annotation type, so the chosen color
-  /// sticks when the user switches between tools.
   void _applyColorToSettings(Color color) {
     final settings = _controller.annotationSettings;
     settings.highlight.color = color;
@@ -285,8 +387,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   // ------------------------------------------------------------- selection
 
-  /// Tapping an existing annotation in pan mode selects it and offers
-  /// recolour / delete, instead of leaving it undeletable until undo.
   void _onAnnotationSelected(Annotation annotation) {
     if (mounted) setState(() => _selectedAnnotation = annotation);
   }
@@ -301,7 +401,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final annotation = _selectedAnnotation;
     if (annotation == null) return;
     HapticFeedback.mediumImpact();
-    // Also drops it from the undo stack via onAnnotationRemoved.
     _controller.removeAnnotation(annotation);
     setState(() => _selectedAnnotation = null);
   }
@@ -316,7 +415,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   // ------------------------------------------------------------- reading
 
-  /// Full-screen reading: hides the app bar, the toolbar and the system bars.
   void _toggleImmersive() {
     if (!_isLoaded) return;
     HapticFeedback.selectionClick();
@@ -340,8 +438,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void _onAnnotationAdded(Annotation annotation) {
     _addedAnnotations.add(annotation);
     if (annotation is StickyNoteAnnotation) {
-      // A tap in comment mode creates an empty note: let the user write the
-      // actual comment. Cancelling removes the note again.
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _promptCommentText(annotation),
       );
@@ -418,7 +514,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
       builder: (context) =>
           SafeArea(child: _CommentsSheet(controller: _controller)),
     );
-    // The sheet deletes notes without closing: refresh the comment badge.
     _refreshCommentCount();
   }
 
@@ -431,7 +526,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (!_isLoaded || _isBusy) return;
     setState(() => _isBusy = true);
     try {
-      // saveDocument returns the document bytes including all annotations.
       final bytes = await _controller.saveDocument();
       final dir = await getTemporaryDirectory();
       final outFile = File(
@@ -455,9 +549,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
     }
   }
 
-  /// Saves a copy of the PDF with all annotations baked in, letting the user
-  /// pick the destination via the system save dialog (Storage Access
-  /// Framework on Android, so no storage permission is needed).
   Future<void> _saveAnnotatedCopy() async {
     if (!_isLoaded || _isBusy) return;
     setState(() => _isBusy = true);
@@ -493,7 +584,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Future<void> _savePageToGallery() async {
     if (!_isLoaded || _isBusy) return;
     setState(() => _isBusy = true);
-    // Read the ratio before the first await: context must not be used after it.
     final pixelRatio = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 3.0);
     try {
       final boundary =
@@ -593,7 +683,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ),
                   onSubmitted: _performSearch,
                   onChanged: (value) {
-                    // Clear results when the field is emptied.
                     if (value.trim().isEmpty && _searchResult != null) {
                       _searchResult?.removeListener(_onSearchResultChanged);
                       _searchResult?.clear();
@@ -661,6 +750,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     ),
                   ),
                 IconButton(
+                  tooltip: 'Table of contents',
+                  icon: const Icon(Icons.menu_book_rounded),
+                  onPressed: _isLoaded ? _openBookmarksSheet : null,
+                ),
+                IconButton(
                   tooltip: 'Search',
                   icon: Icon(
                     _isSearchOpen
@@ -669,16 +763,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ),
                   onPressed: _isLoaded ? _toggleSearch : null,
                 ),
-                IconButton(
-                  tooltip: 'Comments',
-                  icon: const Icon(Icons.chat_bubble_outline_rounded),
-                  onPressed: _openCommentsSheet,
-                ),
-                IconButton(
-                  tooltip: 'Share PDF',
-                  icon: const Icon(Icons.share_rounded),
-                  onPressed: _isBusy ? null : _sharePdf,
-                ),
+
                 IconButton(
                   tooltip: 'Full screen',
                   icon: const Icon(Icons.fullscreen_rounded),
@@ -689,6 +774,35 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   icon: const Icon(Icons.more_vert_rounded),
                   enabled: _isLoaded && !_isBusy,
                   itemBuilder: (context) => [
+                                        const PopupMenuItem(
+                      value: 'comments',
+                      child: ListTile(
+                        leading: Icon(Icons.chat_bubble_outline_rounded),
+                        title: Text('Comments'),
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'share',
+                      child: ListTile(
+                        leading: Icon(Icons.share_rounded),
+                        title: Text('Share PDF'),
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'rotate',
+                      child: ListTile(
+                        leading: Icon(Icons.rotate_right_rounded),
+                        title: Text('Rotate (90°)'),
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'print',
+                      child: ListTile(
+                        leading: Icon(Icons.print_rounded),
+                        title: Text('Print document'),
+                      ),
+                    ),
                     const PopupMenuItem(
                       value: 'save_copy',
                       child: ListTile(
@@ -700,8 +814,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       value: 'gallery',
                       child: ListTile(
                         leading: Icon(Icons.add_photo_alternate_rounded),
-                        // The viewer exposes no per-page geometry, so what is
-                        // captured is the current view (which may span two pages).
                         title: Text('Save current view to gallery'),
                       ),
                     ),
@@ -710,6 +822,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       ComfortMode.normal: 'Normal',
                       ComfortMode.sepia: 'Sepia',
                       ComfortMode.dim: 'Dim',
+                      ComfortMode.inverted: 'Night (Inverted)',
                     }.entries)
                       PopupMenuItem(
                         value: 'comfort_${entry.key.name}',
@@ -742,6 +855,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ],
                   onSelected: (value) {
                     switch (value) {
+                                            case 'comments':
+                        _openCommentsSheet();
+                      case 'share':
+                        _sharePdf();
+                      case 'rotate':
+                        _rotateClockwise();
+                      case 'print':
+                        _printDocument();
                       case 'save_copy':
                         _saveAnnotatedCopy();
                       case 'gallery':
@@ -752,6 +873,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         ReadingPrefs.setComfortMode(ComfortMode.sepia);
                       case 'comfort_dim':
                         ReadingPrefs.setComfortMode(ComfortMode.dim);
+                      case 'comfort_inverted':
+                        ReadingPrefs.setComfortMode(ComfortMode.inverted);
                       case 'settings':
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
@@ -773,70 +896,83 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
-  /// The PDF plus its comfort tint and, in full-screen mode, the two minimal
-  /// controls needed to read (exit and page position).
   Widget _buildViewerArea() {
     return ValueListenableBuilder<ComfortMode>(
       valueListenable: ReadingPrefs.comfortMode,
-      builder: (context, comfort, _) => Stack(
-        fit: StackFit.expand,
-        children: [
-          // The viewer widget is created once and reused: every setState in
-          // this screen (page changes, search results, annotations) then
-          // skips rebuilding the PDF view entirely.
-          RepaintBoundary(key: _viewerKey, child: _viewer),
-          // Comfort tints: cheap translucent layers over the page only, so
-          // the toolbar keeps its exact colours.
-          AnimatedOpacity(
-            duration: const Duration(milliseconds: 250),
-            opacity: comfort == ComfortMode.sepia ? 0.20 : 0,
-            child: const IgnorePointer(
-              child: ColoredBox(color: Color(0xFFE0C489)),
-            ),
+      builder: (context, comfort, _) {
+        Widget content = RepaintBoundary(
+          key: _viewerKey,
+          child: RotatedBox(
+            quarterTurns: _quarterTurns,
+            child: _viewer,
           ),
-          AnimatedOpacity(
-            duration: const Duration(milliseconds: 250),
-            opacity: comfort == ComfortMode.dim ? 0.42 : 0,
-            child: const IgnorePointer(child: ColoredBox(color: Colors.black)),
-          ),
-          if (!_isLoaded) const _OpeningPlaceholder(),
-          if (_immersive) ...[
-            Positioned(
-              top: 0,
-              right: 0,
-              child: SafeArea(
-                child: IconButton(
-                  tooltip: 'Exit full screen',
-                  style: IconButton.styleFrom(backgroundColor: Colors.black38),
-                  icon: const Icon(
-                    Icons.fullscreen_exit_rounded,
-                    color: Colors.white,
-                  ),
-                  onPressed: _toggleImmersive,
-                ),
+        );
+
+        if (comfort == ComfortMode.inverted) {
+          content = ColorFiltered(
+            colorFilter: const ColorFilter.matrix([
+              -1.0,  0.0,  0.0, 0.0, 255.0,
+               0.0, -1.0,  0.0, 0.0, 255.0,
+               0.0,  0.0, -1.0, 0.0, 255.0,
+               0.0,  0.0,  0.0, 1.0,   0.0,
+            ]),
+            child: content,
+          );
+        }
+
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            content,
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 250),
+              opacity: comfort == ComfortMode.sepia ? 0.20 : 0,
+              child: const IgnorePointer(
+                child: ColoredBox(color: Color(0xFFE0C489)),
               ),
             ),
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: SafeArea(
-                child: Center(
-                  child: _PagePill(
-                    label: '$_pageNumber / $_pageCount',
-                    onTap: _promptJumpToPage,
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 250),
+              opacity: comfort == ComfortMode.dim ? 0.42 : 0,
+              child: const IgnorePointer(child: ColoredBox(color: Colors.black)),
+            ),
+            if (!_isLoaded) const _OpeningPlaceholder(),
+            if (_immersive) ...[
+              Positioned(
+                top: 0,
+                right: 0,
+                child: SafeArea(
+                  child: IconButton(
+                    tooltip: 'Exit full screen',
+                    style: IconButton.styleFrom(backgroundColor: Colors.black38),
+                    icon: const Icon(
+                      Icons.fullscreen_exit_rounded,
+                      color: Colors.white,
+                    ),
+                    onPressed: _toggleImmersive,
                   ),
                 ),
               ),
-            ),
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  child: Center(
+                    child: _PagePill(
+                      label: '$_pageNumber / $_pageCount',
+                      onTap: _promptJumpToPage,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
-        ],
-      ),
+        );
+      },
     );
   }
 
-  /// Shown while an annotation is selected in pan mode: recolour it or throw
-  /// it away, so a stray highlight no longer needs an undo to get rid of.
   Widget _buildSelectionBar() {
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(
@@ -866,7 +1002,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 36px hit targets (7 × 36 + a 44px delete fits a 360dp card).
                 for (final color in _annotationPalette)
                   InkWell(
                     onTap: () => _recolorSelected(color),
@@ -922,9 +1057,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
         message: tooltip,
         child: IconButton(
           onPressed: () => _setTool(tool),
-          // IconButton's default constraints + 8px padding would pad the
-          // target *inside* the button, stealing space from every gap; the
-          // AnimatedContainer below is the whole (48px) hit target.
           constraints: const BoxConstraints(minWidth: 0, minHeight: 0),
           visualDensity: VisualDensity.compact,
           padding: EdgeInsets.zero,
@@ -947,9 +1079,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
       );
     }
 
-    /// 24px dot, 36px hit target — the visible swatch stays small while the
-    /// finger gets something comfortable to land on. Seven of them plus Undo
-    /// have to fit a 360dp card, which leaves ~36px each after the icon.
     Widget swatch(Color color) {
       final selected = _color.toARGB32() == color.toARGB32();
       return InkWell(
@@ -1030,10 +1159,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         horizontal: 10,
                         vertical: 4,
                       ),
-                      // Tools sit on their own row so every button is a real
-                      // 46px tap target that never scrolls out from under the
-                      // finger: 6 tools + palette + undo overflowed a 360dp
-                      // card by ~180px when forced into a single strip.
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -1137,8 +1262,73 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 }
 
-/// Lists the document's sticky notes. Deleting one refreshes the list in
-/// place instead of dismissing the sheet.
+/// Outline / Table of contents viewer for PDF bookmarks.
+class _OutlineSheet extends StatelessWidget {
+  const _OutlineSheet({
+    required this.bookmarks,
+    required this.onSelect,
+  });
+
+  final PdfBookmarkBase bookmarks;
+  final ValueChanged<PdfBookmark> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            child: Row(
+              children: [
+                const Icon(Icons.menu_book_rounded, size: 20),
+                const SizedBox(width: 10),
+                Text('Table of contents', style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: bookmarks.count,
+              itemBuilder: (context, index) {
+                final bm = bookmarks[index];
+                return _buildTile(context, bm, 0);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTile(BuildContext context, PdfBookmark bm, int depth) {
+    if (bm.count > 0) {
+      return ExpansionTile(
+        tilePadding: EdgeInsets.only(left: 16.0 + depth * 16.0, right: 16),
+        title: Text(bm.title, style: const TextStyle(fontSize: 14)),
+        children: [
+          for (int i = 0; i < bm.count; i++)
+            _buildTile(context, bm[i], depth + 1),
+        ],
+      );
+    }
+    return ListTile(
+      contentPadding: EdgeInsets.only(left: 16.0 + depth * 16.0, right: 16),
+      title: Text(bm.title, style: const TextStyle(fontSize: 14)),
+      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 13),
+      onTap: () {
+        Navigator.of(context).pop();
+        onSelect(bm);
+      },
+    );
+  }
+}
+
+/// Lists the document's sticky notes.
 class _CommentsSheet extends StatefulWidget {
   const _CommentsSheet({required this.controller});
 
@@ -1155,7 +1345,6 @@ class _CommentsSheetState extends State<_CommentsSheet> {
       .toList();
 
   void _delete(StickyNoteAnnotation note) {
-    // Also drops the note from the undo stack via onAnnotationRemoved.
     widget.controller.removeAnnotation(note);
     setState(() => _notes.remove(note));
     if (_notes.isEmpty) Navigator.of(context).pop();
@@ -1193,8 +1382,6 @@ class _CommentsSheetState extends State<_CommentsSheet> {
   }
 }
 
-/// Tappable "12 / 340" pill in the reader app bar; opens the jump-to-page
-/// prompt.
 class _PagePill extends StatelessWidget {
   const _PagePill({required this.label, required this.onTap});
 
@@ -1227,7 +1414,6 @@ class _PagePill extends StatelessWidget {
   }
 }
 
-/// Small pill showing the search match counter.
 class _MatchBadge extends StatelessWidget {
   const _MatchBadge({required this.label, required this.empty});
 
@@ -1255,8 +1441,6 @@ class _MatchBadge extends StatelessWidget {
   }
 }
 
-/// Shown over the viewer while the document is being parsed, so opening a
-/// large PDF feels instant instead of showing a blank page.
 class _OpeningPlaceholder extends StatelessWidget {
   const _OpeningPlaceholder();
 
@@ -1289,3 +1473,4 @@ class _OpeningPlaceholder extends StatelessWidget {
     );
   }
 }
+

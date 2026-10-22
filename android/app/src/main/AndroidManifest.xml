@@ -1,7 +1,15 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Needed by Gal only on Android 9 and older; Android 10+ uses
          MediaStore which requires no permission for saving own files. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
+    <!-- "All files access" lets Pagelit list every PDF and document on the device, the way a
+         document library does. It is optional: if the user does not grant it,
+         the app lists files from folders chosen with the system folder picker
+         instead (Storage Access Framework, no permission needed). -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage"/>
     <!-- Required for AdMob, sharing and online features in release builds -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
@@ -30,11 +38,29 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
             <!-- Allows Pagelit to appear in the "Open with" sheet when the
-                 user taps a PDF in Files, Downloads, WhatsApp, etc. -->
+                 user taps a PDF or Office document in Files, Downloads, WhatsApp, etc. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <data android:mimeType="application/pdf"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>
+                <data android:mimeType="application/msword"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/>
+                <data android:mimeType="application/vnd.ms-excel"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation"/>
+                <data android:mimeType="application/vnd.ms-powerpoint"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

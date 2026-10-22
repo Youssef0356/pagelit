@@ -53,6 +53,8 @@ app.*.map.json
 # release identity for com.the356company.pagelit. Keep an offline backup.
 # ---------------------------------------------------------------------------
 /android/key.properties
+# Kotlin build cache
+.kotlin/
 *.jks
 *.keystore
 *.p12

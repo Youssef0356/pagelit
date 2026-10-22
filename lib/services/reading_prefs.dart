@@ -2,25 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
-/// Page tint for comfortable reading (sepia for paper, dim for night).
-enum ComfortMode { normal, sepia, dim }
+/// Page tint for comfortable reading (sepia for paper, dim for low light, inverted for true night mode).
+enum ComfortMode { normal, sepia, dim, inverted }
 
 /// Reading preferences shared by the settings screen and the reader.
-///
-/// Values are hot: the reader listens to these notifiers, so changes made in
-/// Settings apply the moment the user comes back — except [layoutMode], which
-/// is read once when a document opens (changing it would rebuild the viewer
-/// and drop in-session annotations).
 class ReadingPrefs {
   static const _keepScreenOnKey = 'keep_screen_on';
   static const _comfortKey = 'comfort_mode';
   static const _layoutKey = 'page_layout_mode';
+  static const _scrollDirectionKey = 'scroll_direction';
   static const _colorKey = 'annotation_color';
 
   /// Keep the screen awake while a document is open.
   static final ValueNotifier<bool> keepScreenOn = ValueNotifier(false);
 
-  /// Warm/dark tint applied over the page.
+  /// Warm/dark/inverted tint applied over the page.
   static final ValueNotifier<ComfortMode> comfortMode = ValueNotifier(
     ComfortMode.normal,
   );
@@ -28,6 +24,11 @@ class ReadingPrefs {
   /// Continuous scroll or one page at a time. Applied at document open.
   static final ValueNotifier<PdfPageLayoutMode> layoutMode = ValueNotifier(
     PdfPageLayoutMode.continuous,
+  );
+
+  /// Vertical or horizontal scroll direction.
+  static final ValueNotifier<PdfScrollDirection> scrollDirection = ValueNotifier(
+    PdfScrollDirection.vertical,
   );
 
   /// Colour given to newly created annotations.
@@ -45,6 +46,10 @@ class ReadingPrefs {
     layoutMode.value = PdfPageLayoutMode.values.firstWhere(
       (mode) => mode.name == prefs.getString(_layoutKey),
       orElse: () => PdfPageLayoutMode.continuous,
+    );
+    scrollDirection.value = PdfScrollDirection.values.firstWhere(
+      (dir) => dir.name == prefs.getString(_scrollDirectionKey),
+      orElse: () => PdfScrollDirection.vertical,
     );
     final stored = prefs.getInt(_colorKey);
     annotationColor.value = stored == null ? Colors.yellow : Color(stored);
@@ -66,6 +71,12 @@ class ReadingPrefs {
     layoutMode.value = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_layoutKey, value.name);
+  }
+
+  static Future<void> setScrollDirection(PdfScrollDirection value) async {
+    scrollDirection.value = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_scrollDirectionKey, value.name);
   }
 
   static Future<void> setAnnotationColor(Color value) async {

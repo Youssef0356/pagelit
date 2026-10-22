@@ -10,7 +10,7 @@ packages:
     source: hosted
     version: "2.1.1"
   archive:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: archive
       sha256: "0d58d1fa1fddf6588251ccf2819f3fb3b6d0452c1b2813ac7413a05592bfbefe"
@@ -726,7 +726,7 @@ packages:
     source: hosted
     version: "35.1.40+1"
   syncfusion_flutter_pdf:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: syncfusion_flutter_pdf
       sha256: c016c8017283913dbf77bbb2ae7d7607f929cfdfceca45262623c61afd6f4f08
@@ -990,7 +990,7 @@ packages:
     source: hosted
     version: "1.1.0"
   xml:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: xml
       sha256: "67f0aff7be013d107995e9b75bf4e7f2c3ef2dfdb2c8e68024bba0a7fd5756a4"
