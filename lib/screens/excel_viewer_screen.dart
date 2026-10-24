@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/encoding_utils.dart';
 import '../services/excel_parser.dart';
 import '../services/gallery_saver.dart';
@@ -81,6 +82,7 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
 
   Future<void> _saveSheetToGallery() async {
     if (_workbook == null || _workbook!.sheets.isEmpty || _isSavingToGallery) return;
+    final l10n = context.l10n;
     setState(() => _isSavingToGallery = true);
     final cleanTitle = EncodingUtils.cleanDisplayName(widget.title);
     final sheet = _workbook!.sheets[_activeSheetIndex];
@@ -89,7 +91,7 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
         context: context,
         boundaryKey: _sheetTableKey,
         baseName: 'Pagelit_${cleanTitle}_${sheet.name}',
-        successMessage: 'Sheet "${sheet.name}" view saved to gallery',
+        successMessage: l10n.sheetViewSaved(sheet.name),
       );
     } finally {
       if (mounted) setState(() => _isSavingToGallery = false);
@@ -121,8 +123,8 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-
 
     return Scaffold(
       appBar: AppBar(
@@ -155,7 +157,7 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Search',
+            tooltip: l10n.search,
             icon: Icon(_isSearchOpen ? Icons.search_off_rounded : Icons.search_rounded),
             onPressed: () => setState(() {
               _isSearchOpen = !_isSearchOpen;
@@ -166,28 +168,44 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
             }),
           ),
           IconButton(
-            tooltip: 'Share',
-            icon: const Icon(Icons.share_rounded),
-            onPressed: _shareFile,
-          ),
-          IconButton(
-            tooltip: 'Save sheet view to gallery',
-            icon: _isSavingToGallery
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.add_photo_alternate_rounded),
-            onPressed: _isSavingToGallery || _workbook == null || _workbook!.sheets.isEmpty
-                ? null
-                : _saveSheetToGallery,
-          ),
-          IconButton(
-            tooltip: 'Ask Gemini',
+            tooltip: l10n.askGemini,
             icon: const Icon(Icons.auto_awesome_rounded),
             color: Theme.of(context).colorScheme.primary,
             onPressed: _workbook == null || _workbook!.sheets.isEmpty ? null : _askGemini,
+          ),
+          PopupMenuButton<String>(
+            tooltip: l10n.more,
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (val) {
+              switch (val) {
+                case 'gallery':
+                  if (!_isSavingToGallery && _workbook != null && _workbook!.sheets.isNotEmpty) {
+                    _saveSheetToGallery();
+                  }
+                  break;
+                case 'share':
+                  _shareFile();
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'gallery',
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.add_photo_alternate_rounded),
+                  title: Text(l10n.saveSheetViewToGallery),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'share',
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.share_rounded),
+                  title: Text(l10n.share),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -201,7 +219,7 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
                 controller: _searchController,
                 autofocus: true,
                 decoration: InputDecoration(
-                  hintText: 'Search cell contents...',
+                  hintText: l10n.searchCellContents,
                   prefixIcon: const Icon(Icons.search_rounded, size: 20),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
@@ -219,14 +237,14 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
                 onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
               ),
             ),
-          Expanded(child: _buildBody()),
+          Expanded(child: _buildBody(l10n)),
           if (_selectedCell != null || (_workbook != null && _workbook!.sheets.length > 1))
             SafeArea(
               top: false,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (_selectedCell != null) _buildCellInspector(),
+                  if (_selectedCell != null) _buildCellInspector(l10n),
                   if (_workbook != null && _workbook!.sheets.length > 1) _buildSheetTabBar(),
                 ],
               ),
@@ -236,7 +254,7 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(AppLocalizations l10n) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -251,19 +269,19 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
               const SizedBox(height: 14),
               Text(_error!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _loadFile, child: const Text('Retry')),
+              FilledButton(onPressed: _loadFile, child: Text(l10n.retry)),
             ],
           ),
         ),
       );
     }
     if (_workbook == null || _workbook!.sheets.isEmpty) {
-      return const Center(child: Text('Empty workbook'));
+      return Center(child: Text(l10n.emptyWorkbook));
     }
 
     final sheet = _workbook!.sheets[_activeSheetIndex];
     if (sheet.maxRow == 0 || sheet.maxCol == 0) {
-      return const Center(child: Text('This sheet contains no data.'));
+      return Center(child: Text(l10n.sheetContainsNoData));
     }
 
     final scheme = Theme.of(context).colorScheme;
@@ -360,7 +378,7 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
         height: 36,
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         color: bgColor,
-        alignment: Alignment.centerLeft,
+        alignment: AlignmentDirectional.centerStart,
         child: Text(
           val,
           maxLines: 1,
@@ -375,7 +393,7 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
     );
   }
 
-  Widget _buildCellInspector() {
+  Widget _buildCellInspector(AppLocalizations l10n) {
     final cell = _selectedCell!;
     final scheme = Theme.of(context).colorScheme;
 
@@ -420,7 +438,7 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 SelectableText(
-                  cell.value.isEmpty ? '(Empty)' : cell.value,
+                  cell.value.isEmpty ? l10n.emptyCell : cell.value,
                   style: TextStyle(
                     fontSize: 13,
                     color: cell.value.isEmpty ? scheme.outline : scheme.onSurface,
@@ -432,20 +450,20 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
           ),
           if (cell.value.isNotEmpty)
             IconButton(
-              tooltip: 'Copy value',
+              tooltip: l10n.copyValue,
               icon: const Icon(Icons.copy_rounded, size: 20),
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: cell.value));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Copied cell text to clipboard'),
-                    duration: Duration(seconds: 2),
+                  SnackBar(
+                    content: Text(l10n.copiedCellText),
+                    duration: const Duration(seconds: 2),
                   ),
                 );
               },
             ),
           IconButton(
-            tooltip: 'Dismiss',
+            tooltip: l10n.dismiss,
             icon: const Icon(Icons.close_rounded, size: 20),
             onPressed: () => setState(() => _selectedCell = null),
           ),

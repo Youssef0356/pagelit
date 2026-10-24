@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
+import 'services/locale_prefs.dart';
 import 'services/premium_service.dart';
 import 'services/reading_prefs.dart';
 import 'services/theme_prefs.dart';
@@ -11,6 +14,7 @@ import 'theme/app_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ThemePrefs.load();
+  await LocalePrefs.load();
   await ReadingPrefs.load();
   // Cached flag, so the first frame already hides ads for premium users.
   await PremiumService.load();
@@ -31,15 +35,26 @@ class PagelitApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: ThemePrefs.mode,
-      builder: (context, themeMode, _) => MaterialApp(
-        title: 'Pagelit',
-        debugShowCheckedModeBanner: false,
-        themeMode: themeMode,
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
-        home: const HomeScreen(),
+    return ValueListenableBuilder<Locale?>(
+      valueListenable: LocalePrefs.locale,
+      builder: (context, locale, _) => ValueListenableBuilder<ThemeMode>(
+        valueListenable: ThemePrefs.mode,
+        builder: (context, themeMode, _) => MaterialApp(
+          title: 'Pagelit',
+          debugShowCheckedModeBanner: false,
+          themeMode: themeMode,
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          locale: locale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: const HomeScreen(),
+        ),
       ),
     );
   }

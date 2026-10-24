@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:share_plus/share_plus.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/encoding_utils.dart';
 import '../services/gallery_saver.dart';
 import '../services/gemini_share_service.dart';
@@ -81,6 +82,7 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
 
   Future<void> _saveViewToGallery() async {
     if (_doc == null || _doc!.blocks.isEmpty || _isSavingToGallery) return;
+    final l10n = context.l10n;
     setState(() => _isSavingToGallery = true);
     final cleanTitle = EncodingUtils.cleanDisplayName(widget.title);
     try {
@@ -88,7 +90,7 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
         context: context,
         boundaryKey: _documentViewKey,
         baseName: 'Pagelit_${cleanTitle}_doc',
-        successMessage: 'Document view saved to gallery',
+        successMessage: l10n.documentViewSaved,
       );
     } finally {
       if (mounted) setState(() => _isSavingToGallery = false);
@@ -108,6 +110,7 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -141,7 +144,7 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Search',
+            tooltip: l10n.search,
             icon: Icon(_isSearchOpen ? Icons.search_off_rounded : Icons.search_rounded),
             onPressed: () => setState(() {
               _isSearchOpen = !_isSearchOpen;
@@ -152,42 +155,70 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
             }),
           ),
           IconButton(
-            tooltip: 'Smaller text',
-            icon: const Icon(Icons.text_decrease_rounded),
-            onPressed: () => setState(() {
-              if (_fontScale > 0.8) _fontScale -= 0.1;
-            }),
-          ),
-          IconButton(
-            tooltip: 'Larger text',
-            icon: const Icon(Icons.text_increase_rounded),
-            onPressed: () => setState(() {
-              if (_fontScale < 1.8) _fontScale += 0.1;
-            }),
-          ),
-          IconButton(
-            tooltip: 'Share',
-            icon: const Icon(Icons.share_rounded),
-            onPressed: _shareFile,
-          ),
-          IconButton(
-            tooltip: 'Save view to gallery',
-            icon: _isSavingToGallery
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.add_photo_alternate_rounded),
-            onPressed: _isSavingToGallery || _doc == null || _doc!.blocks.isEmpty
-                ? null
-                : _saveViewToGallery,
-          ),
-          IconButton(
-            tooltip: 'Ask Gemini',
+            tooltip: l10n.askGemini,
             icon: const Icon(Icons.auto_awesome_rounded),
             color: Theme.of(context).colorScheme.primary,
             onPressed: _doc == null || _doc!.blocks.isEmpty ? null : _askGemini,
+          ),
+          PopupMenuButton<String>(
+            tooltip: l10n.more,
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (val) {
+              switch (val) {
+                case 'text_minus':
+                  setState(() {
+                    if (_fontScale > 0.8) _fontScale -= 0.1;
+                  });
+                  break;
+                case 'text_plus':
+                  setState(() {
+                    if (_fontScale < 1.8) _fontScale += 0.1;
+                  });
+                  break;
+                case 'gallery':
+                  if (!_isSavingToGallery && _doc != null && _doc!.blocks.isNotEmpty) {
+                    _saveViewToGallery();
+                  }
+                  break;
+                case 'share':
+                  _shareFile();
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'text_minus',
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.text_decrease_rounded),
+                  title: Text(l10n.smallerText),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'text_plus',
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.text_increase_rounded),
+                  title: Text(l10n.largerText),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'gallery',
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.add_photo_alternate_rounded),
+                  title: Text(l10n.saveWordViewToGallery),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'share',
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.share_rounded),
+                  title: Text(l10n.share),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -201,7 +232,7 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
                 controller: _searchController,
                 autofocus: true,
                 decoration: InputDecoration(
-                  hintText: 'Search in document...',
+                  hintText: l10n.searchWordHint,
                   prefixIcon: const Icon(Icons.search_rounded, size: 20),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
@@ -219,13 +250,13 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
                 onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
               ),
             ),
-          Expanded(child: _buildBody()),
+          Expanded(child: _buildBody(l10n)),
         ],
       ),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(AppLocalizations l10n) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -240,14 +271,14 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
               const SizedBox(height: 14),
               Text(_error!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _loadFile, child: const Text('Retry')),
+              FilledButton(onPressed: _loadFile, child: Text(l10n.retry)),
             ],
           ),
         ),
       );
     }
     if (_doc == null || _doc!.blocks.isEmpty) {
-      return const Center(child: Text('This document is empty.'));
+      return Center(child: Text(l10n.wordDocumentEmpty));
     }
 
     final scheme = Theme.of(context).colorScheme;
@@ -318,7 +349,7 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
           children: [
             if (block.isBullet)
               Padding(
-                padding: const EdgeInsets.only(right: 8, top: 4),
+                padding: const EdgeInsetsDirectional.only(end: 8, top: 4),
                 child: Text('•', style: TextStyle(fontSize: 16 * _fontScale, color: textColor)),
               ),
             Expanded(

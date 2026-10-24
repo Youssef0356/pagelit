@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:gal/gal.dart';
 
+import '../l10n/app_localizations.dart';
+
 /// Reusable utility to save snapshots or image bytes directly to the device photo gallery.
 class GallerySaver {
   GallerySaver._();
@@ -17,13 +19,14 @@ class GallerySaver {
     String? successMessage,
   }) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
     final pixelRatio = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 3.0);
 
     try {
       final boundary = boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Viewer is not ready to capture')),
+          SnackBar(content: Text(l10n.viewerNotReady)),
         );
         return false;
       }
@@ -34,7 +37,7 @@ class GallerySaver {
 
       if (byteData == null) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Could not generate image snapshot')),
+          SnackBar(content: Text(l10n.couldNotGenerateSnapshot)),
         );
         return false;
       }
@@ -43,11 +46,13 @@ class GallerySaver {
         messenger: messenger,
         imageBytes: byteData.buffer.asUint8List(),
         name: baseName,
-        successMessage: successMessage ?? 'Saved snapshot to gallery',
+        successMessage: successMessage ?? l10n.savedToGallerySuccess,
+        permissionDeniedMessage: l10n.galleryPermissionDenied,
+        couldNotSaveMessage: l10n.couldNotSaveToGallery,
       );
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not save to gallery: $e')),
+        SnackBar(content: Text(l10n.couldNotSaveToGallery('$e'))),
       );
       return false;
     }
@@ -61,11 +66,14 @@ class GallerySaver {
     String? successMessage,
   }) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
     return _saveBytesWithMessenger(
       messenger: messenger,
       imageBytes: imageBytes,
       name: name,
-      successMessage: successMessage,
+      successMessage: successMessage ?? l10n.savedToGallerySuccess,
+      permissionDeniedMessage: l10n.galleryPermissionDenied,
+      couldNotSaveMessage: l10n.couldNotSaveToGallery,
     );
   }
 
@@ -73,13 +81,15 @@ class GallerySaver {
     required ScaffoldMessengerState messenger,
     required Uint8List imageBytes,
     required String name,
-    String? successMessage,
+    required String successMessage,
+    required String permissionDeniedMessage,
+    required String Function(String error) couldNotSaveMessage,
   }) async {
     try {
       final hasAccess = await Gal.hasAccess() || await Gal.requestAccess();
       if (!hasAccess) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Gallery permission denied')),
+          SnackBar(content: Text(permissionDeniedMessage)),
         );
         return false;
       }
@@ -96,7 +106,7 @@ class GallerySaver {
 
       messenger.showSnackBar(
         SnackBar(
-          content: Text(successMessage ?? 'Saved to gallery successfully'),
+          content: Text(successMessage),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -104,7 +114,7 @@ class GallerySaver {
     } on GalException catch (e) {
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Could not save to gallery: ${e.type.message}'),
+          content: Text(couldNotSaveMessage(e.type.message)),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -112,7 +122,7 @@ class GallerySaver {
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Could not save to gallery: $e'),
+          content: Text(couldNotSaveMessage('$e')),
           behavior: SnackBarBehavior.floating,
         ),
       );

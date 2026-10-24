@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../ads/ad_banner.dart';
+import '../l10n/app_localizations.dart';
 import '../services/device_pdfs.dart';
 import '../services/encoding_utils.dart';
 import '../services/gallery_saver.dart';
@@ -137,7 +138,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Could not open PDF: ${details.error}')),
+      SnackBar(content: Text(context.l10n.couldNotOpenPdf(details.error))),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) Navigator.of(context).pop();
@@ -145,25 +146,26 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _promptPassword() async {
+    final l10n = context.l10n;
     final passwordController = TextEditingController();
     final entered = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Password Protected'),
+        title: Text(l10n.passwordProtected),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('This document is encrypted. Enter password to open:'),
+            Text(l10n.passwordPrompt),
             const SizedBox(height: 12),
             TextField(
               controller: passwordController,
               autofocus: true,
               obscureText: true,
-              decoration: const InputDecoration(
-                hintText: 'Password',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                hintText: l10n.passwordHint,
+                border: const OutlineInputBorder(),
               ),
               onSubmitted: (val) => Navigator.of(context).pop(val),
             ),
@@ -172,11 +174,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(null),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(passwordController.text),
-            child: const Text('Unlock'),
+            child: Text(l10n.unlock),
           ),
         ],
       ),
@@ -194,9 +196,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   void _openBookmarksSheet() {
+    final l10n = context.l10n;
     if (_bookmarks == null || _bookmarks!.count == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This document has no table of contents.')),
+        SnackBar(content: Text(l10n.noTableOfContents)),
       );
       return;
     }
@@ -216,10 +219,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _printDocument() async {
+    final l10n = context.l10n;
     final ok = await DevicePdfLibrary.printFile(widget.filePath);
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Printing is not supported on this device.')),
+        SnackBar(content: Text(l10n.printingNotSupported)),
       );
     }
   }
@@ -279,20 +283,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Future<void> _promptJumpToPage() async {
     if (!_isLoaded || _pageCount <= 1) return;
+    final l10n = context.l10n;
     _jumpInput.text = '$_pageNumber';
     final target = await showDialog<int>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Go to page'),
+        title: Text(l10n.goToPage),
         content: TextField(
           controller: _jumpInput,
           autofocus: true,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: const InputDecoration(
-            hintText: 'Page number',
-            border: OutlineInputBorder(),
-            suffixText: 'of',
+          decoration: InputDecoration(
+            hintText: l10n.pageNumberHint,
+            border: const OutlineInputBorder(),
+            suffixText: l10n.ofWord,
           ),
           onSubmitted: (value) =>
               Navigator.of(context).pop(int.tryParse(value)),
@@ -300,12 +305,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () =>
                 Navigator.of(context).pop(int.tryParse(_jumpInput.text)),
-            child: const Text('Go'),
+            child: Text(l10n.go),
           ),
         ],
       ),
@@ -313,7 +318,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (!mounted || target == null) return;
     if (target < 1 || target > _pageCount) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Page must be between 1 and $_pageCount')),
+        SnackBar(content: Text(l10n.pageMustBeBetween(_pageCount))),
       );
       return;
     }
@@ -451,28 +456,29 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Future<void> _promptCommentText(StickyNoteAnnotation annotation) async {
+    final l10n = context.l10n;
     _commentInput.clear();
     final text = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Add comment'),
+        title: Text(l10n.addComment),
         content: TextField(
           controller: _commentInput,
           autofocus: true,
           maxLines: null,
-          decoration: const InputDecoration(
-            hintText: 'Write a note about this spot…',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            hintText: l10n.commentHint,
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(_commentInput.text),
-            child: const Text('Save'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -498,12 +504,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Future<void> _openCommentsSheet() async {
     if (!mounted) return;
+    final l10n = context.l10n;
     if (_comments.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No comments yet. Tap with the comment tool to add one.',
-          ),
+        SnackBar(
+          content: Text(l10n.noCommentsYet),
         ),
       );
       return;
@@ -543,7 +548,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Could not share: $e')));
+        ).showSnackBar(SnackBar(content: Text(context.l10n.couldNotShare('$e'))));
       }
     } finally {
       if (mounted) setState(() => _isBusy = false);
@@ -552,6 +557,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Future<void> _saveAnnotatedCopy() async {
     if (!_isLoaded || _isBusy) return;
+    final l10n = context.l10n;
     setState(() => _isBusy = true);
     try {
       final bytes = await _controller.saveDocument();
@@ -564,7 +570,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Saved to $savedPath'),
+            content: Text(l10n.savedToPath(savedPath)),
             duration: const Duration(seconds: 4),
           ),
         );
@@ -573,7 +579,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Could not save: $e')));
+        ).showSnackBar(SnackBar(content: Text(context.l10n.couldNotSave('$e'))));
       }
     } finally {
       if (mounted) setState(() => _isBusy = false);
@@ -584,13 +590,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   Future<void> _savePageToGallery() async {
     if (!_isLoaded || _isBusy) return;
+    final l10n = context.l10n;
     setState(() => _isBusy = true);
     try {
       await GallerySaver.saveBoundaryToGallery(
         context: context,
         boundaryKey: _viewerKey,
         baseName: 'Pagelit_${_baseName}_page_${_controller.pageNumber}',
-        successMessage: 'View of page ${_controller.pageNumber} saved to gallery',
+        successMessage: l10n.viewOfPageSaved(_controller.pageNumber),
       );
     } finally {
       if (mounted) setState(() => _isBusy = false);
@@ -614,6 +621,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   // ----------------------------------------------------------------- build
 
   Widget _buildSearchBar() {
+    final l10n = context.l10n;
     final colorScheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final result = _searchResult;
@@ -624,7 +632,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final status = result == null || !result.isSearchCompleted
         ? ''
         : result.totalInstanceCount == 0
-        ? 'No results'
+        ? l10n.noResults
         : '${result.currentInstanceIndex} / ${result.totalInstanceCount}';
     return Material(
       color: colorScheme.surface,
@@ -633,7 +641,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         child: Row(
           children: [
             IconButton(
-              tooltip: 'Close search',
+              tooltip: l10n.closeSearch,
               icon: const Icon(Icons.close_rounded, size: 22),
               onPressed: _closeSearch,
             ),
@@ -654,7 +662,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   style: text.bodyMedium,
                   cursorColor: colorScheme.primary,
                   decoration: InputDecoration(
-                    hintText: 'Search in document',
+                    hintText: l10n.searchInDocument,
                     hintStyle: text.bodyMedium?.copyWith(
                       color: colorScheme.outline,
                     ),
@@ -676,21 +684,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
             ),
             if (status.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(left: 8),
+                padding: const EdgeInsetsDirectional.only(start: 8),
                 child: _MatchBadge(
                   label: status,
-                  empty: status == 'No results',
+                  empty: status == l10n.noResults,
                 ),
               ),
             IconButton(
-              tooltip: 'Previous match',
+              tooltip: l10n.previousMatch,
               icon: const Icon(Icons.keyboard_arrow_up_rounded),
               onPressed: hasMatches
                   ? () => _searchResult!.previousInstance()
                   : null,
             ),
             IconButton(
-              tooltip: 'Next match',
+              tooltip: l10n.nextMatch,
               icon: const Icon(Icons.keyboard_arrow_down_rounded),
               onPressed: hasMatches
                   ? () => _searchResult!.nextInstance()
@@ -704,6 +712,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
       appBar: _immersive
           ? null
@@ -724,19 +733,19 @@ class _ReaderScreenState extends State<ReaderScreen> {
               actions: [
                 if (_pageCount > 0)
                   Padding(
-                    padding: const EdgeInsets.only(right: 4),
+                    padding: const EdgeInsetsDirectional.only(end: 4),
                     child: _PagePill(
                       label: '$_pageNumber / $_pageCount',
                       onTap: _promptJumpToPage,
                     ),
                   ),
                 IconButton(
-                  tooltip: 'Table of contents',
+                  tooltip: l10n.tableOfContents,
                   icon: const Icon(Icons.menu_book_rounded),
                   onPressed: _isLoaded ? _openBookmarksSheet : null,
                 ),
                 IconButton(
-                  tooltip: 'Search',
+                  tooltip: l10n.search,
                   icon: Icon(
                     _isSearchOpen
                         ? Icons.search_off_rounded
@@ -746,77 +755,77 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 ),
 
                 IconButton(
-                  tooltip: 'Full screen',
+                  tooltip: l10n.fullScreen,
                   icon: const Icon(Icons.fullscreen_rounded),
                   onPressed: _isLoaded ? _toggleImmersive : null,
                 ),
                 IconButton(
-                  tooltip: 'Ask Gemini',
+                  tooltip: l10n.askGemini,
                   icon: const Icon(Icons.auto_awesome_rounded),
                   color: Theme.of(context).colorScheme.primary,
                   onPressed: _isLoaded && !_isBusy ? _askGemini : null,
                 ),
                 PopupMenuButton<String>(
-                  tooltip: 'More',
+                  tooltip: l10n.more,
                   icon: const Icon(Icons.more_vert_rounded),
                   enabled: _isLoaded && !_isBusy,
                   itemBuilder: (context) => [
-                                        const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'comments',
                       child: ListTile(
-                        leading: Icon(Icons.chat_bubble_outline_rounded),
-                        title: Text('Comments'),
+                        leading: const Icon(Icons.chat_bubble_outline_rounded),
+                        title: Text(l10n.comments),
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'share',
                       child: ListTile(
-                        leading: Icon(Icons.share_rounded),
-                        title: Text('Share PDF'),
+                        leading: const Icon(Icons.share_rounded),
+                        title: Text(l10n.sharePdf),
                       ),
                     ),
                     const PopupMenuDivider(),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'rotate',
                       child: ListTile(
-                        leading: Icon(Icons.rotate_right_rounded),
-                        title: Text('Rotate (90°)'),
+                        leading: const Icon(Icons.rotate_right_rounded),
+                        title: Text(l10n.rotate90),
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'print',
                       child: ListTile(
-                        leading: Icon(Icons.print_rounded),
-                        title: Text('Print document'),
+                        leading: const Icon(Icons.print_rounded),
+                        title: Text(l10n.printDocument),
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'save_copy',
                       child: ListTile(
-                        leading: Icon(Icons.save_as_rounded),
-                        title: Text('Save annotated copy'),
+                        leading: const Icon(Icons.save_as_rounded),
+                        title: Text(l10n.saveAnnotatedCopy),
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'gallery',
                       child: ListTile(
-                        leading: Icon(Icons.add_photo_alternate_rounded),
-                        title: Text('Save current view to gallery'),
+                        leading: const Icon(Icons.add_photo_alternate_rounded),
+                        title: Text(l10n.saveCurrentViewToGallery),
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'gemini',
                       child: ListTile(
-                        leading: Icon(Icons.auto_awesome_rounded),
-                        title: Text('Ask Gemini about this page'),
+                        leading: const Icon(Icons.auto_awesome_rounded),
+                        title: Text(l10n.askGeminiAboutPage),
                       ),
                     ),
                     const PopupMenuDivider(),
-                    for (final entry in const {
-                      ComfortMode.normal: 'Normal',
-                      ComfortMode.sepia: 'Sepia',
-                      ComfortMode.dim: 'Dim',
-                      ComfortMode.inverted: 'Night (Inverted)',
+                    for (final entry in {
+                      ComfortMode.normal: l10n.comfortNormal,
+                      ComfortMode.sepia: l10n.comfortSepia,
+                      ComfortMode.dim: l10n.comfortDim,
+                      ComfortMode.inverted: l10n.comfortNight,
                     }.entries)
                       PopupMenuItem(
                         value: 'comfort_${entry.key.name}',
@@ -839,11 +848,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         ),
                       ),
                     const PopupMenuDivider(),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'settings',
                       child: ListTile(
-                        leading: Icon(Icons.settings_outlined),
-                        title: Text('Settings'),
+                        leading: const Icon(Icons.settings_outlined),
+                        title: Text(l10n.settings),
                       ),
                     ),
                   ],
@@ -893,6 +902,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Widget _buildViewerArea() {
+    final l10n = context.l10n;
     return ValueListenableBuilder<ComfortMode>(
       valueListenable: ReadingPrefs.comfortMode,
       builder: (context, comfort, _) {
@@ -939,7 +949,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 right: 0,
                 child: SafeArea(
                   child: IconButton(
-                    tooltip: 'Exit full screen',
+                    tooltip: l10n.exitFullScreen,
                     style: IconButton.styleFrom(backgroundColor: Colors.black38),
                     icon: const Icon(
                       Icons.fullscreen_exit_rounded,
@@ -970,6 +980,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Widget _buildSelectionBar() {
+    final l10n = context.l10n;
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -993,7 +1004,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
             borderRadius: BorderRadius.circular(AppShape.radiusLarge),
             side: BorderSide(color: colorScheme.outlineVariant),
           ),
-          child: Padding(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1032,7 +1045,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   width: 44,
                   height: 44,
                   child: IconButton(
-                    tooltip: 'Delete annotation',
+                    tooltip: l10n.deleteAnnotation,
                     icon: const Icon(Icons.delete_outline_rounded, size: 21),
                     onPressed: _deleteSelected,
                   ),
@@ -1046,6 +1059,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Widget _buildBottomBar() {
+    final l10n = context.l10n;
     final colorScheme = Theme.of(context).colorScheme;
     Widget toolButton(_Tool tool, IconData icon, String tooltip) {
       final selected = _tool == tool;
@@ -1161,32 +1175,32 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           toolButton(
                             _Tool.pan,
                             Icons.pan_tool_alt_rounded,
-                            'Read / pan',
+                            l10n.toolReadPan,
                           ),
                           toolButton(
                             _Tool.highlight,
                             Icons.highlight_rounded,
-                            'Highlight',
+                            l10n.toolHighlight,
                           ),
                           toolButton(
                             _Tool.underline,
                             Icons.format_underlined_rounded,
-                            'Underline',
+                            l10n.toolUnderline,
                           ),
                           toolButton(
                             _Tool.strikethrough,
                             Icons.format_strikethrough_rounded,
-                            'Strikethrough',
+                            l10n.toolStrikethrough,
                           ),
                           toolButton(
                             _Tool.squiggly,
                             Icons.waves_rounded,
-                            'Squiggly',
+                            l10n.toolSquiggly,
                           ),
                           toolButton(
                             _Tool.comment,
                             Icons.sticky_note_2_rounded,
-                            'Comment',
+                            l10n.toolComment,
                           ),
                         ],
                       ),
@@ -1205,7 +1219,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       child: Row(
                         children: [
                           Tooltip(
-                            message: 'Annotation colour',
+                            message: l10n.annotationColor,
                             child: Icon(
                               Icons.palette_outlined,
                               size: 20,
@@ -1213,10 +1227,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             ),
                           ),
                           const SizedBox(width: 6),
-                          for (final color in _palette) swatch(color),
-                          const Spacer(),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  for (final color in _palette) swatch(color),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
                           IconButton(
-                            tooltip: 'Undo',
+                            tooltip: l10n.undo,
                             icon: const Icon(Icons.undo_rounded, size: 21),
                             onPressed: _addedAnnotations.isEmpty ? null : _undo,
                           ),
@@ -1270,6 +1295,7 @@ class _OutlineSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1281,7 +1307,7 @@ class _OutlineSheet extends StatelessWidget {
               children: [
                 const Icon(Icons.menu_book_rounded, size: 20),
                 const SizedBox(width: 10),
-                Text('Table of contents', style: Theme.of(context).textTheme.titleMedium),
+                Text(l10n.tableOfContents, style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
           ),
@@ -1305,7 +1331,7 @@ class _OutlineSheet extends StatelessWidget {
     final cleanTitle = EncodingUtils.cleanDisplayName(bm.title);
     if (bm.count > 0) {
       return ExpansionTile(
-        tilePadding: EdgeInsets.only(left: 16.0 + depth * 16.0, right: 16),
+        tilePadding: EdgeInsetsDirectional.only(start: 16.0 + depth * 16.0, end: 16),
         title: Text(cleanTitle, style: const TextStyle(fontSize: 14)),
         children: [
           for (int i = 0; i < bm.count; i++)
@@ -1314,7 +1340,7 @@ class _OutlineSheet extends StatelessWidget {
       );
     }
     return ListTile(
-      contentPadding: EdgeInsets.only(left: 16.0 + depth * 16.0, right: 16),
+      contentPadding: EdgeInsetsDirectional.only(start: 16.0 + depth * 16.0, end: 16),
       title: Text(cleanTitle, style: const TextStyle(fontSize: 14)),
       trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 13),
       onTap: () {
@@ -1349,10 +1375,11 @@ class _CommentsSheetState extends State<_CommentsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     if (_notes.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 160,
-        child: Center(child: Text('No comments left')),
+        child: Center(child: Text(l10n.noCommentsLeft)),
       );
     }
     return ListView.builder(
@@ -1363,9 +1390,9 @@ class _CommentsSheetState extends State<_CommentsSheet> {
         return ListTile(
           leading: Icon(Icons.sticky_note_2_rounded, color: note.color),
           title: Text(note.text, maxLines: 3, overflow: TextOverflow.ellipsis),
-          subtitle: Text('Page ${note.pageNumber}'),
+          subtitle: Text('${l10n.goToPage} ${note.pageNumber}'),
           trailing: IconButton(
-            tooltip: 'Delete comment',
+            tooltip: l10n.deleteComment,
             icon: const Icon(Icons.delete_outline_rounded),
             onPressed: () => _delete(note),
           ),
@@ -1387,10 +1414,11 @@ class _PagePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     return Tooltip(
-      message: 'Go to page',
+      message: l10n.goToPage,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(999),
@@ -1443,6 +1471,7 @@ class _OpeningPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     return Material(
@@ -1453,7 +1482,7 @@ class _OpeningPlaceholder extends StatelessWidget {
           children: [
             const PdfGlyph(size: 40),
             const SizedBox(height: 18),
-            Text('Opening document…', style: text.titleSmall),
+            Text(l10n.openingDocument, style: text.titleSmall),
             const SizedBox(height: 14),
             SizedBox(
               width: 120,

@@ -5,7 +5,9 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/device_pdfs.dart';
+import '../services/locale_prefs.dart';
 import '../services/premium_service.dart';
 import '../services/reading_prefs.dart';
 import '../services/reading_progress.dart';
@@ -15,8 +17,8 @@ import '../services/theme_prefs.dart';
 /// Published GitHub Pages site (see docs/README.md).
 const _privacyUrl = 'https://the356company.github.io/pagelit/privacy.html';
 
-/// App settings: appearance, reading behaviour, annotation defaults, stored
-/// data and about info. Everything here is also reachable from the reader.
+/// App settings: appearance, language, reading behaviour, annotation defaults,
+/// stored data and about info. Everything here is also reachable from the reader.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -46,19 +48,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   String _formatSize(int bytes) {
-    if (bytes <= 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    var value = bytes.toDouble();
-    var unit = 0;
-    while (value >= 1024 && unit < units.length - 1) {
-      value /= 1024;
-      unit++;
-    }
-    final digits = unit == 0 || value >= 100 ? 0 : 1;
-    return '${value.toStringAsFixed(digits)} ${units[unit]}';
+    if (bytes <= 0) return context.l10n.formatBytes(0);
+    return context.l10n.formatBytes(bytes);
   }
 
   Future<void> _manageFolders() async {
+    final l10n = context.l10n;
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -75,12 +70,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const Icon(Icons.folder_open_rounded, size: 22),
                     const SizedBox(width: 10),
                     Text(
-                      'Scanned Folders',
+                      l10n.scannedFolders,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const Spacer(),
                     IconButton(
-                      tooltip: 'Add folder',
+                      tooltip: l10n.addFolder,
                       icon: const Icon(Icons.create_new_folder_outlined),
                       onPressed: () async {
                         await DevicePdfLibrary.addFolder();
@@ -94,11 +89,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const Divider(height: 1),
               if (_folders.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(24),
+                Padding(
+                  padding: const EdgeInsets.all(24),
                   child: Center(
                     child: Text(
-                      'No custom folders added yet.\nTap the + button to select a folder.',
+                      l10n.noCustomFolders,
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -125,7 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         trailing: IconButton(
-                          tooltip: 'Remove folder',
+                          tooltip: l10n.removeFolder,
                           icon: const Icon(Icons.delete_outline_rounded),
                           onPressed: () async {
                             await DevicePdfLibrary.removeFolder(uri);
@@ -147,22 +142,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _clearCache() async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear cached files?'),
-        content: const Text(
-          'This will remove temporary copies of documents opened from other apps (WhatsApp, Downloads, Drive). '
-          'Your original files on device are not deleted.',
-        ),
+        title: Text(l10n.clearCacheTitle),
+        content: Text(l10n.clearCacheContent),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Clear'),
+            child: Text(l10n.clear),
           ),
         ],
       ),
@@ -172,27 +165,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _loadStorageInfo();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Document cache cleared')),
+      SnackBar(content: Text(l10n.cacheClearedSnackbar)),
     );
   }
 
   Future<void> _confirmClearData(BuildContext context) async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear recents?'),
-        content: const Text(
-          'This removes your recent files list, cached documents, and every saved reading position. '
-          'Your original documents are not deleted.',
-        ),
+        title: Text(l10n.clearRecentsConfirmTitle),
+        content: Text(l10n.clearRecentsConfirmContent),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Clear'),
+            child: Text(l10n.clear),
           ),
         ],
       ),
@@ -207,98 +198,125 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _loadStorageInfo();
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Recents, cache, and progress cleared')),
+      SnackBar(content: Text(l10n.recentsClearedSnackbar)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final text = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(l10n.settings)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
         children: [
           _Section(
-            label: 'APPEARANCE',
+            label: l10n.appearance,
             child: ValueListenableBuilder<ThemeMode>(
               valueListenable: ThemePrefs.mode,
               builder: (context, mode, _) => _ChoiceRow<ThemeMode>(
                 value: mode,
-                options: const {
-                  ThemeMode.system: 'System',
-                  ThemeMode.light: 'Light',
-                  ThemeMode.dark: 'Dark',
+                options: {
+                  ThemeMode.system: l10n.themeSystem,
+                  ThemeMode.light: l10n.themeLight,
+                  ThemeMode.dark: l10n.themeDark,
                 },
                 onChanged: ThemePrefs.set,
               ),
             ),
           ),
           _Section(
-            label: 'READING',
+            label: l10n.language,
+            child: ValueListenableBuilder<Locale?>(
+              valueListenable: LocalePrefs.locale,
+              builder: (context, currentLocale, _) {
+                final selectedCode = currentLocale?.languageCode ?? 'system';
+                return _ChoiceRow<String>(
+                  value: selectedCode,
+                  options: {
+                    'system': l10n.languageSystem,
+                    'en': 'English',
+                    'fr': 'Français',
+                    'ar': 'العربية',
+                  },
+                  onChanged: (code) {
+                    if (code == 'system') {
+                      LocalePrefs.set(null);
+                    } else {
+                      LocalePrefs.set(Locale(code));
+                    }
+                  },
+                );
+              },
+            ),
+          ),
+          _Section(
+            label: l10n.reading,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ValueListenableBuilder<bool>(
                   valueListenable: ReadingPrefs.keepScreenOn,
                   builder: (context, keepAwake, _) => SwitchListTile(
                     value: keepAwake,
                     onChanged: ReadingPrefs.setKeepScreenOn,
-                    title: const Text('Keep screen on'),
-                    subtitle: const Text('While a document is open'),
+                    title: Text(l10n.keepScreenOn),
+                    subtitle: Text(l10n.whileDocumentIsOpen),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('Page layout', style: text.titleSmall),
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(l10n.pageLayout, style: text.titleSmall),
                 ),
                 const SizedBox(height: 10),
                 ValueListenableBuilder<PdfPageLayoutMode>(
                   valueListenable: ReadingPrefs.layoutMode,
                   builder: (context, mode, _) => _ChoiceRow<PdfPageLayoutMode>(
                     value: mode,
-                    options: const {
-                      PdfPageLayoutMode.continuous: 'Continuous',
-                      PdfPageLayoutMode.single: 'One page',
+                    options: {
+                      PdfPageLayoutMode.continuous: l10n.layoutContinuous,
+                      PdfPageLayoutMode.single: l10n.layoutSingle,
                     },
                     onChanged: ReadingPrefs.setLayoutMode,
                   ),
                 ),
                 const SizedBox(height: 16),
                 Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('Scroll direction', style: text.titleSmall),
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(l10n.scrollDirection, style: text.titleSmall),
                 ),
                 const SizedBox(height: 10),
                 ValueListenableBuilder<PdfScrollDirection>(
                   valueListenable: ReadingPrefs.scrollDirection,
                   builder: (context, dir, _) => _ChoiceRow<PdfScrollDirection>(
                     value: dir,
-                    options: const {
-                      PdfScrollDirection.vertical: 'Vertical',
-                      PdfScrollDirection.horizontal: 'Horizontal',
+                    options: {
+                      PdfScrollDirection.vertical: l10n.scrollVertical,
+                      PdfScrollDirection.horizontal: l10n.scrollHorizontal,
                     },
                     onChanged: ReadingPrefs.setScrollDirection,
                   ),
                 ),
                 const SizedBox(height: 18),
                 Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('Comfort & Night mode', style: text.titleSmall),
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(l10n.comfortMode, style: text.titleSmall),
                 ),
                 const SizedBox(height: 10),
                 ValueListenableBuilder<ComfortMode>(
                   valueListenable: ReadingPrefs.comfortMode,
                   builder: (context, mode, _) => _ChoiceRow<ComfortMode>(
                     value: mode,
-                    options: const {
-                      ComfortMode.normal: 'Normal',
-                      ComfortMode.sepia: 'Sepia',
-                      ComfortMode.dim: 'Dim',
-                      ComfortMode.inverted: 'Night',
+                    options: {
+                      ComfortMode.normal: l10n.comfortNormal,
+                      ComfortMode.sepia: l10n.comfortSepia,
+                      ComfortMode.dim: l10n.comfortDim,
+                      ComfortMode.inverted: l10n.comfortNight,
                     },
                     onChanged: ReadingPrefs.setComfortMode,
                   ),
@@ -307,14 +325,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           _Section(
-            label: 'ANNOTATIONS',
+            label: l10n.annotations,
             child: ValueListenableBuilder<Color>(
               valueListenable: ReadingPrefs.annotationColor,
               builder: (context, color, _) => Row(
                 children: [
                   for (final swatch in _annotationPalette)
                     Padding(
-                      padding: const EdgeInsets.only(right: 12),
+                      padding: const EdgeInsetsDirectional.only(end: 12),
                       child: GestureDetector(
                         onTap: () {
                           HapticFeedback.selectionClick();
@@ -344,17 +362,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           _Section(
-            label: 'STORAGE & FOLDERS',
+            label: l10n.storageAndFolders,
             child: Column(
               children: [
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.folder_special_outlined),
-                  title: const Text('Scanned folders'),
+                  title: Text(l10n.scannedFolders),
                   subtitle: Text(
                     _folders.isEmpty
-                        ? 'No custom folders selected'
-                        : '${_folders.length} custom folder${_folders.length == 1 ? '' : 's'} scanned',
+                        ? l10n.noCustomFoldersSelected
+                        : l10n.scannedFoldersCount(_folders.length),
                   ),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: _manageFolders,
@@ -362,8 +380,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.cleaning_services_outlined),
-                  title: const Text('Clear shared document cache'),
-                  subtitle: Text('Temporary copies: ${_formatSize(_cacheSizeBytes)}'),
+                  title: Text(l10n.clearSharedCache),
+                  subtitle: Text(l10n.temporaryCopies(_formatSize(_cacheSizeBytes))),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: _cacheSizeBytes > 0 ? _clearCache : null,
                 ),
@@ -373,8 +391,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Icons.delete_outline_rounded,
                     color: scheme.primary,
                   ),
-                  title: const Text('Clear recents and progress'),
-                  subtitle: const Text('Removes the list and reading positions'),
+                  title: Text(l10n.clearRecentsTitle),
+                  subtitle: Text(l10n.clearRecentsSubtitle),
                   onTap: () => _confirmClearData(context),
                 ),
               ],
@@ -421,7 +439,7 @@ class _Section extends StatelessWidget {
   }
 }
 
-/// One row of mutually exclusive choices (appearance, layout, comfort).
+/// One row of mutually exclusive choices (appearance, language, layout, comfort).
 class _ChoiceRow<T> extends StatelessWidget {
   const _ChoiceRow({
     required this.value,
@@ -435,14 +453,37 @@ class _ChoiceRow<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SegmentedButton<T>(
-      segments: [
-        for (final entry in options.entries)
-          ButtonSegment<T>(value: entry.key, label: Text(entry.value, style: const TextStyle(fontSize: 12))),
-      ],
-      selected: {value},
-      showSelectedIcon: false,
-      onSelectionChanged: (selection) => onChanged(selection.first),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: SegmentedButton<T>(
+              style: const ButtonStyle(
+                visualDensity: VisualDensity.compact,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              segments: [
+                for (final entry in options.entries)
+                  ButtonSegment<T>(
+                    value: entry.key,
+                    label: Text(
+                      entry.value,
+                      style: const TextStyle(fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              selected: {value},
+              showSelectedIcon: false,
+              onSelectionChanged: (selection) => onChanged(selection.first),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -478,6 +519,7 @@ class _PremiumSectionState extends State<_PremiumSection> {
   }
 
   Future<void> _buy() async {
+    final l10n = context.l10n;
     final started = await PremiumService.buy();
     if (started || !mounted) return;
 
@@ -485,20 +527,16 @@ class _PremiumSectionState extends State<_PremiumSection> {
       final shouldSimulate = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Play Billing Unavailable'),
-          content: const Text(
-            'Google Play Billing could not find the in-app product "remove_ads".\n\n'
-            'This is normal during local development or before the product is published on Google Play.\n\n'
-            'Would you like to activate Premium in test mode now?',
-          ),
+          title: Text(l10n.playBillingUnavailableTitle),
+          content: Text(l10n.playBillingUnavailableContent),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text(l10n.cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Activate Premium'),
+              child: Text(l10n.activatePremium),
             ),
           ],
         ),
@@ -507,7 +545,7 @@ class _PremiumSectionState extends State<_PremiumSection> {
         await PremiumService.grantPremium(persist: true);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Premium activated! Ads are removed.')),
+            SnackBar(content: Text(l10n.premiumActivatedSnackbar)),
           );
         }
       }
@@ -516,8 +554,8 @@ class _PremiumSectionState extends State<_PremiumSection> {
 
     final errorMessage = PremiumService.lastError.value ??
         (PremiumService.priceLabel.value == null
-            ? 'Unable to connect to Google Play. Please check your internet connection and Google Play Services.'
-            : 'Could not start the purchase. Please try again.');
+            ? l10n.billingConnectError
+            : l10n.billingPurchaseError);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(errorMessage)),
@@ -525,20 +563,22 @@ class _PremiumSectionState extends State<_PremiumSection> {
   }
 
   Future<void> _restore() async {
+    final l10n = context.l10n;
     final outcome = await PremiumService.restore();
     if (!mounted) return;
     if (outcome == RestoreOutcome.notFound) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No previous purchase found.')),
+        SnackBar(content: Text(l10n.noPreviousPurchase)),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final colorScheme = Theme.of(context).colorScheme;
     return _Section(
-      label: 'PREMIUM',
+      label: l10n.premium,
       child: ValueListenableBuilder<bool>(
         valueListenable: PremiumService.isPremium,
         builder: (context, premium, _) => Column(
@@ -553,15 +593,15 @@ class _PremiumSectionState extends State<_PremiumSection> {
                       : Icons.workspace_premium_outlined,
                   color: colorScheme.primary,
                 ),
-                title: const Text('Remove ads'),
+                title: Text(l10n.removeAds),
                 subtitle: premium
-                    ? const Text('Thank you! Ads are off everywhere.')
+                    ? Text(l10n.premiumActiveSubtitle)
                     : ValueListenableBuilder<String?>(
                         valueListenable: PremiumService.priceLabel,
                         builder: (context, price, _) => Text(
                           price == null
-                              ? 'One-time purchase'
-                              : 'One-time purchase · $price',
+                              ? l10n.oneTimePurchase
+                              : l10n.oneTimePurchaseWithPrice(price),
                         ),
                       ),
                 trailing: premium
@@ -581,12 +621,12 @@ class _PremiumSectionState extends State<_PremiumSection> {
             ),
             if (!premium)
               Align(
-                alignment: Alignment.centerRight,
+                alignment: AlignmentDirectional.centerEnd,
                 child: ValueListenableBuilder<bool>(
                   valueListenable: PremiumService.isBuying,
                   builder: (context, buying, _) => TextButton(
                     onPressed: buying ? null : _restore,
-                    child: const Text('Restore purchases'),
+                    child: Text(l10n.restorePurchases),
                   ),
                 ),
               ),
@@ -595,10 +635,8 @@ class _PremiumSectionState extends State<_PremiumSection> {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 dense: true,
-                title: const Text('Simulate premium (debug)'),
-                subtitle: const Text(
-                  'Enable ad-free mode for testing (persists on this device)',
-                ),
+                title: Text(l10n.simulatePremium),
+                subtitle: Text(l10n.simulatePremiumSubtitle),
                 value: premium,
                 onChanged: PremiumService.debugSetPremium,
               ),
@@ -635,15 +673,16 @@ class _AboutSectionState extends State<_AboutSection> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final colorScheme = Theme.of(context).colorScheme;
     return _Section(
-      label: 'ABOUT',
+      label: l10n.about,
       child: Column(
         children: [
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.info_outline_rounded),
-            title: const Text('Version'),
+            title: Text(l10n.version),
             trailing: Text(
               _version,
               style: Theme.of(context).textTheme.labelMedium,
@@ -652,7 +691,7 @@ class _AboutSectionState extends State<_AboutSection> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('Privacy policy'),
+            title: Text(l10n.privacyPolicy),
             trailing: Icon(
               Icons.open_in_new_rounded,
               size: 18,
@@ -672,4 +711,3 @@ class _AboutSectionState extends State<_AboutSection> {
     }
   }
 }
-

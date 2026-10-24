@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../ads/ad_banner.dart';
+import '../l10n/app_localizations.dart';
 import '../services/device_pdfs.dart';
 import '../services/encoding_utils.dart';
 import '../services/reading_progress.dart';
@@ -107,8 +108,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final requested = await DevicePdfLibrary.requestAllFilesAccess();
     if (requested || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Choose a folder so Pagelit can find your PDFs.'),
+      SnackBar(
+        content: Text(context.l10n.chooseFolderPrompt),
       ),
     );
     await _addDeviceFolder();
@@ -120,6 +121,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _manageFolders() async {
+    final l10n = context.l10n;
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -136,12 +138,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     const Icon(Icons.folder_open_rounded, size: 22),
                     const SizedBox(width: 10),
                     Text(
-                      'Scanned Folders',
+                      l10n.scannedFolders,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const Spacer(),
                     IconButton(
-                      tooltip: 'Add folder',
+                      tooltip: l10n.addFolder,
                       icon: const Icon(Icons.create_new_folder_outlined),
                       onPressed: () async {
                         await DevicePdfLibrary.addFolder();
@@ -155,11 +157,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
               const Divider(height: 1),
               if (_deviceFolders.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(24),
+                Padding(
+                  padding: const EdgeInsets.all(24),
                   child: Center(
                     child: Text(
-                      'No custom folders added yet.\nTap the + button to select a folder to scan.',
+                      l10n.noCustomFolders,
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -186,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         trailing: IconButton(
-                          tooltip: 'Remove folder',
+                          tooltip: l10n.removeFolder,
                           icon: const Icon(Icons.delete_outline_rounded),
                           onPressed: () async {
                             await DevicePdfLibrary.removeFolder(uri);
@@ -213,7 +215,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (path == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Could not open that document.')));
+      ).showSnackBar(SnackBar(content: Text(context.l10n.couldNotOpenDocument)));
       return;
     }
     await _openReader(path);
@@ -312,42 +314,43 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     required int size,
     required DateTime? modified,
   }) {
+    final l10n = context.l10n;
     final ext = name.split('.').last.toUpperCase();
     final typeDesc = switch (ext) {
-      'PDF' => 'PDF Document',
-      'DOCX' || 'DOC' => 'Microsoft Word Document',
-      'XLSX' || 'XLS' => 'Microsoft Excel Spreadsheet',
-      'PPTX' || 'PPT' => 'Microsoft PowerPoint Presentation',
+      'PDF' => l10n.pdfDocumentType,
+      'DOCX' || 'DOC' => l10n.wordDocumentType,
+      'XLSX' || 'XLS' => l10n.excelSpreadsheetType,
+      'PPTX' || 'PPT' => l10n.powerPointPresentationType,
       _ => '$ext File',
     };
 
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('File Details'),
+        title: Text(l10n.fileDetails),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _detailRow('Name', name),
+            _detailRow(l10n.fileName, name),
             const SizedBox(height: 10),
-            _detailRow('Type', typeDesc),
+            _detailRow(l10n.fileType, typeDesc),
             const SizedBox(height: 10),
-            _detailRow('Size', _formatSize(size)),
+            _detailRow(l10n.fileSize, _formatSize(size, l10n)),
             if (modified != null) ...[
               const SizedBox(height: 10),
-              _detailRow('Modified', '${modified.day}/${modified.month}/${modified.year} ${modified.hour.toString().padLeft(2, '0')}:${modified.minute.toString().padLeft(2, '0')}'),
+              _detailRow(l10n.fileModified, '${modified.day}/${modified.month}/${modified.year} ${modified.hour.toString().padLeft(2, '0')}:${modified.minute.toString().padLeft(2, '0')}'),
             ],
             if (path != null && path.isNotEmpty) ...[
               const SizedBox(height: 10),
-              _detailRow('Location', path, isSelectable: true),
+              _detailRow(l10n.fileLocation, path, isSelectable: true),
             ],
           ],
         ),
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: Text(l10n.close),
           ),
         ],
       ),
@@ -368,43 +371,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  String _formatDate(DateTime date) {
+  String _formatDate(DateTime date, AppLocalizations l10n) {
     final now = DateTime.now();
     final diff = now.difference(date);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inHours < 1) return '${diff.inMinutes} min ago';
-    if (diff.inDays < 1) return '${diff.inHours} h ago';
-    if (diff.inDays < 7) return '${diff.inDays} d ago';
+    if (diff.inMinutes < 1) return l10n.justNow;
+    if (diff.inHours < 1) return l10n.minutesAgo(diff.inMinutes);
+    if (diff.inDays < 1) return l10n.hoursAgo(diff.inHours);
+    if (diff.inDays < 7) return l10n.daysAgo(diff.inDays);
     return '${date.day}/${date.month}/${date.year}';
   }
 
-  String _metaFor(RecentFile file) {
-    final date = _formatDate(file.openedAt).toUpperCase();
+  String _metaFor(RecentFile file, AppLocalizations l10n) {
+    final date = _formatDate(file.openedAt, l10n).toUpperCase();
     final pos = _progress[file.path];
     if (pos == null || pos.pages == 0) return date;
-    return 'PAGE ${pos.page} OF ${pos.pages} · ${pos.percent}% · $date';
+    return l10n.pageXOfY(pos.page, pos.pages, pos.percent, date);
   }
 
-  String _deviceMetaFor(DevicePdf pdf) {
-    final size = _formatSize(pdf.size);
-    final date = _formatDate(pdf.modified).toUpperCase();
+  String _deviceMetaFor(DevicePdf pdf, AppLocalizations l10n) {
+    final size = _formatSize(pdf.size, l10n);
+    final date = _formatDate(pdf.modified, l10n).toUpperCase();
     final path = pdf.path;
     final pos = path == null ? null : _progress[path];
     if (pos == null || pos.pages == 0) return '$size · $date';
-    return 'PAGE ${pos.page} OF ${pos.pages} · ${pos.percent}% · $size';
+    return l10n.pageXOfY(pos.page, pos.pages, pos.percent, size);
   }
 
-  String _formatSize(int bytes) {
+  String _formatSize(int bytes, AppLocalizations l10n) {
     if (bytes <= 0) return '—';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    var value = bytes.toDouble();
-    var unit = 0;
-    while (value >= 1024 && unit < units.length - 1) {
-      value /= 1024;
-      unit++;
-    }
-    final digits = unit == 0 || value >= 100 ? 0 : 1;
-    return '${value.toStringAsFixed(digits)} ${units[unit]}';
+    return l10n.formatBytes(bytes);
   }
 
   List<DevicePdf> get _filteredDevicePdfs {
@@ -441,6 +436,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -450,7 +446,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
         actions: [
           IconButton(
-            tooltip: 'Search documents',
+            tooltip: l10n.searchDocuments,
             icon: Icon(_isSearchOpen ? Icons.search_off_rounded : Icons.search_rounded),
             onPressed: () => setState(() {
               _isSearchOpen = !_isSearchOpen;
@@ -461,27 +457,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             }),
           ),
           PopupMenuButton<SortMode>(
-            tooltip: 'Sort by',
+            tooltip: l10n.sortBy,
             icon: const Icon(Icons.sort_rounded),
             initialValue: _sortMode,
             onSelected: (mode) => setState(() => _sortMode = mode),
-            itemBuilder: (context) => const [
+            itemBuilder: (context) => [
               PopupMenuItem(
                 value: SortMode.date,
-                child: Text('Date (Newest first)'),
+                child: Text(l10n.sortDate),
               ),
               PopupMenuItem(
                 value: SortMode.name,
-                child: Text('Name (A–Z)'),
+                child: Text(l10n.sortName),
               ),
               PopupMenuItem(
                 value: SortMode.size,
-                child: Text('File Size (Largest first)'),
+                child: Text(l10n.sortSize),
               ),
             ],
           ),
           IconButton(
-            tooltip: 'Settings',
+            tooltip: l10n.settings,
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
@@ -499,7 +495,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 controller: _searchController,
                 autofocus: true,
                 decoration: InputDecoration(
-                  hintText: 'Search files by name...',
+                  hintText: l10n.searchFilesHint,
                   prefixIcon: const Icon(Icons.search_rounded, size: 20),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
@@ -517,7 +513,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
               ),
             ),
-          Expanded(child: _buildBody()),
+          Expanded(child: _buildBody(l10n)),
           _OpenDock(onOpen: _pickFile),
         ],
       ),
@@ -530,7 +526,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(AppLocalizations l10n) {
     if (_isLoading) return const _RecentsSkeleton();
     final nothingYet =
         _recents.isEmpty &&
@@ -541,10 +537,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (nothingYet) {
       return _EmptyState(onOpen: _pickFile, onFindDevice: _grantAllFilesAccess);
     }
-    return _buildHomeList();
+    return _buildHomeList(l10n);
   }
 
-  Widget _buildHomeList() {
+  Widget _buildHomeList(AppLocalizations l10n) {
     final text = Theme.of(context).textTheme;
     final devicePdfs = _filteredDevicePdfs;
     final recents = _filteredRecents;
@@ -557,20 +553,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
             sliver: SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.only(left: 4),
+                padding: const EdgeInsetsDirectional.only(start: 4),
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text('ON THIS DEVICE', style: text.labelSmall),
+                      child: Text(l10n.onThisDevice, style: text.labelSmall),
                     ),
                     IconButton(
-                      tooltip: 'Scanned folders',
+                      tooltip: l10n.scannedFolders,
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(Icons.folder_open_rounded, size: 20),
                       onPressed: _manageFolders,
                     ),
                     IconButton(
-                      tooltip: 'Add a folder',
+                      tooltip: l10n.addFolder,
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(
                         Icons.create_new_folder_outlined,
@@ -579,7 +575,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       onPressed: _addDeviceFolder,
                     ),
                     IconButton(
-                      tooltip: 'Refresh',
+                      tooltip: l10n.refresh,
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(Icons.refresh_rounded, size: 20),
                       onPressed: _deviceLoading
@@ -609,8 +605,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
                 child: Text(
                   _searchQuery.isNotEmpty
-                      ? 'No matching files found.'
-                      : 'No documents found yet. Add another folder to scan.',
+                      ? l10n.noMatchingFiles
+                      : l10n.noDocumentsYet,
                   style: text.bodyMedium,
                 ),
               ),
@@ -626,7 +622,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   return _RecentCard(
                     key: ValueKey(pdf.id),
                     name: pdf.name,
-                    meta: _deviceMetaFor(pdf),
+                    meta: _deviceMetaFor(pdf, l10n),
                     progress: _progress[pdf.path]?.progress ?? 0,
                     exists: true,
                     onOpen: () => _openDevicePdf(pdf),
@@ -645,8 +641,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
               sliver: SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: Text('RECENT FILES', style: text.labelSmall),
+                  padding: const EdgeInsetsDirectional.only(start: 4),
+                  child: Text(l10n.recentFiles, style: text.labelSmall),
                 ),
               ),
             ),
@@ -656,7 +652,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 itemCount: recents.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) =>
-                    _buildRecentCard(recents[index]),
+                    _buildRecentCard(recents[index], l10n),
               ),
             ),
           ],
@@ -666,7 +662,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildRecentCard(RecentFile file) {
+  Widget _buildRecentCard(RecentFile file, AppLocalizations l10n) {
     final exists = !_missingPaths.contains(file.path);
     final fileObj = File(file.path);
     final size = exists ? (fileObj.existsSync() ? fileObj.lengthSync() : 0) : 0;
@@ -678,7 +674,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       background: _SwipeToDelete(),
       child: _RecentCard(
         name: file.name,
-        meta: exists ? _metaFor(file) : 'FILE NOT FOUND',
+        meta: exists ? _metaFor(file, l10n) : l10n.fileNotFound,
         progress: _progress[file.path]?.progress ?? 0,
         exists: exists,
         onOpen: () => exists ? _openReader(file.path) : _removeRecent(file),
@@ -699,8 +695,8 @@ class _SwipeToDelete extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.only(right: 20),
+      alignment: AlignmentDirectional.centerEnd,
+      padding: const EdgeInsetsDirectional.only(end: 20),
       decoration: BoxDecoration(
         color: scheme.primaryContainer,
         borderRadius: BorderRadius.circular(AppShape.radiusLarge),
@@ -737,6 +733,7 @@ class _RecentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     return Container(
@@ -762,7 +759,7 @@ class _RecentCard extends StatelessWidget {
             InkWell(
               onTap: onOpen,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 14, 6, 12),
+                padding: const EdgeInsetsDirectional.fromSTEB(14, 14, 6, 12),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -795,7 +792,7 @@ class _RecentCard extends StatelessWidget {
                       ),
                     ),
                     PopupMenuButton<_CardAction>(
-                      tooltip: 'File options',
+                      tooltip: l10n.fileOptions,
                       icon: const Icon(Icons.more_horiz_rounded, size: 20),
                       padding: EdgeInsets.zero,
                       onSelected: (action) => switch (action) {
@@ -804,19 +801,19 @@ class _RecentCard extends StatelessWidget {
                         _CardAction.remove => onRemove?.call(),
                       },
                       itemBuilder: (context) => [
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: _CardAction.open,
-                          child: Text('Open'),
+                          child: Text(l10n.open),
                         ),
                         if (onDetails != null)
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: _CardAction.details,
-                            child: Text('Details'),
+                            child: Text(l10n.details),
                           ),
                         if (onRemove != null)
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: _CardAction.remove,
-                            child: Text('Remove from recents'),
+                            child: Text(l10n.removeFromRecents),
                           ),
                       ],
                     ),
@@ -831,7 +828,7 @@ class _RecentCard extends StatelessWidget {
                 child: ColoredBox(
                   color: scheme.outlineVariant,
                   child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
+                    alignment: AlignmentDirectional.centerStart,
                     widthFactor: progress.clamp(0.0, 1.0).toDouble(),
                     child: const ColoredBox(color: AppPalette.signal),
                   ),
@@ -924,6 +921,7 @@ class _OpenDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     return Material(
       color: scheme.surface,
@@ -941,7 +939,7 @@ class _OpenDock extends StatelessWidget {
         child: FilledButton.icon(
           onPressed: onOpen,
           icon: const Icon(Icons.folder_open_rounded, size: 20),
-          label: const Text('Open PDF'),
+          label: Text(l10n.openPdf),
         ),
       ),
     );
@@ -956,6 +954,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final text = Theme.of(context).textTheme;
     return Center(
       child: SingleChildScrollView(
@@ -966,14 +965,13 @@ class _EmptyState extends StatelessWidget {
             const PaperStack(),
             const SizedBox(height: 28),
             Text(
-              'Welcome to Pagelit',
+              l10n.welcomeTitle,
               style: text.headlineSmall,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 10),
             Text(
-              'Open a PDF, Word, Excel or PowerPoint file to start reading.\n'
-              'Highlight, annotate, search, share, or save pages to gallery.',
+              l10n.welcomeSubtitle,
               textAlign: TextAlign.center,
               style: text.bodyMedium,
             ),
@@ -981,13 +979,13 @@ class _EmptyState extends StatelessWidget {
             FilledButton.icon(
               onPressed: onOpen,
               icon: const Icon(Icons.file_open_rounded, size: 20),
-              label: const Text('Open your first PDF'),
+              label: Text(l10n.openFirstPdf),
             ),
             const SizedBox(height: 6),
             TextButton.icon(
               onPressed: onFindDevice,
               icon: const Icon(Icons.smartphone_rounded, size: 18),
-              label: const Text('Find PDFs on this device'),
+              label: Text(l10n.findPdfsOnDevice),
             ),
           ],
         ),
@@ -1007,6 +1005,7 @@ class _DeviceAccessCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     return Container(
@@ -1024,14 +1023,13 @@ class _DeviceAccessCard extends StatelessWidget {
               Icon(Icons.folder_open_rounded, size: 20, color: scheme.primary),
               const SizedBox(width: 10),
               Expanded(
-                child: Text('Show PDFs on this device', style: text.titleSmall),
+                child: Text(l10n.showPdfsOnDevice, style: text.titleSmall),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
-            'Pagelit can list every PDF and Office document stored on your phone, newest first. '
-            'Allow full storage access, or pick folders to scan.',
+            l10n.deviceAccessDescription,
             style: text.bodySmall,
           ),
           const SizedBox(height: 14),
@@ -1040,14 +1038,20 @@ class _DeviceAccessCard extends StatelessWidget {
               Expanded(
                 child: FilledButton(
                   onPressed: onAllow,
-                  child: const Text('Allow access'),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(l10n.allowAccess),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton(
                   onPressed: onChooseFolder,
-                  child: const Text('Choose folder'),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(l10n.chooseFolder),
+                  ),
                 ),
               ),
             ],
@@ -1063,6 +1067,7 @@ class _DeviceLoadingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
@@ -1078,7 +1083,7 @@ class _DeviceLoadingRow extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Text(
-            'Looking for documents…',
+            l10n.lookingForDocuments,
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
@@ -1135,7 +1140,7 @@ class _RecentsSkeletonState extends State<_RecentsSkeleton>
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
           children: [
             Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 14),
+              padding: const EdgeInsetsDirectional.only(start: 4, bottom: 14),
               child: block(120, 12, 6),
             ),
             for (var i = 0; i < 4; i++) ...[

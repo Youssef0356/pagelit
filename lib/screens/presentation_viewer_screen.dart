@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/encoding_utils.dart';
 import '../services/gallery_saver.dart';
 import '../services/gemini_share_service.dart';
@@ -83,6 +84,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
 
   Future<void> _saveSlideToGallery() async {
     if (_deck == null || _deck!.slides.isEmpty || _isSavingToGallery) return;
+    final l10n = context.l10n;
     setState(() => _isSavingToGallery = true);
     final cleanTitle = EncodingUtils.cleanDisplayName(widget.title);
     final slideNum = _currentSlideIndex + 1;
@@ -91,7 +93,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
         context: context,
         boundaryKey: _slideCardKey,
         baseName: 'Pagelit_${cleanTitle}_slide_$slideNum',
-        successMessage: 'Slide $slideNum saved to gallery',
+        successMessage: l10n.slideSaved(slideNum),
       );
     } finally {
       if (mounted) setState(() => _isSavingToGallery = false);
@@ -112,6 +114,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
 
   void _openSlideOverview() {
     if (_deck == null || _deck!.slides.isEmpty) return;
+    final l10n = context.l10n;
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -125,7 +128,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
                 child: Row(
                   children: [
                     Text(
-                      'All Slides (${_deck!.slides.length})',
+                      l10n.allSlidesCount(_deck!.slides.length),
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ],
@@ -179,7 +182,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Slide ${slide.slideNumber}',
+                                  l10n.slideNumber(slide.slideNumber),
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
@@ -214,6 +217,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
   }
 
   void _viewImage(Uint8List imageBytes) {
+    final l10n = context.l10n;
     showDialog<void>(
       context: context,
       builder: (dialogCtx) => Dialog(
@@ -234,7 +238,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton.filledTonal(
-                  tooltip: 'Save image to gallery',
+                  tooltip: l10n.saveImageToGallery,
                   icon: const Icon(Icons.download_rounded),
                   onPressed: () async {
                     final cleanTitle = EncodingUtils.cleanDisplayName(widget.title);
@@ -242,7 +246,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
                       context: dialogCtx,
                       imageBytes: imageBytes,
                       name: 'Pagelit_${cleanTitle}_img_${DateTime.now().millisecondsSinceEpoch}',
-                      successMessage: 'Image saved to gallery',
+                      successMessage: l10n.imageSavedToGallery,
                     );
                   },
                 ),
@@ -297,6 +301,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final cleanTitle = EncodingUtils.cleanDisplayName(widget.title);
 
@@ -332,7 +337,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
         actions: [
           if (_deck != null && _deck!.slides.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(right: 4),
+              padding: const EdgeInsetsDirectional.only(end: 4),
               child: ActionChip(
                 avatar: const Icon(Icons.grid_view_rounded, size: 16),
                 label: Text('${_currentSlideIndex + 1} / ${_deck!.slides.length}'),
@@ -340,26 +345,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
               ),
             ),
           IconButton(
-            tooltip: _fillContainer ? 'Aspect ratio mode (16:9)' : 'Expanded big container',
-            icon: Icon(_fillContainer ? Icons.aspect_ratio_rounded : Icons.fullscreen_rounded),
-            onPressed: () => setState(() => _fillContainer = !_fillContainer),
-          ),
-          IconButton(
-            tooltip: 'Decrease text size',
-            icon: const Icon(Icons.text_decrease_rounded, size: 20),
-            onPressed: () => setState(() {
-              if (_fontScale > 0.8) _fontScale -= 0.1;
-            }),
-          ),
-          IconButton(
-            tooltip: 'Increase text size',
-            icon: const Icon(Icons.text_increase_rounded, size: 20),
-            onPressed: () => setState(() {
-              if (_fontScale < 1.8) _fontScale += 0.1;
-            }),
-          ),
-          IconButton(
-            tooltip: 'Search',
+            tooltip: l10n.search,
             icon: Icon(_isSearchOpen ? Icons.search_off_rounded : Icons.search_rounded),
             onPressed: () => setState(() {
               _isSearchOpen = !_isSearchOpen;
@@ -370,28 +356,81 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
             }),
           ),
           IconButton(
-            tooltip: 'Share',
-            icon: const Icon(Icons.share_rounded),
-            onPressed: _shareFile,
-          ),
-          IconButton(
-            tooltip: 'Save slide to gallery',
-            icon: _isSavingToGallery
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.add_photo_alternate_rounded),
-            onPressed: _isSavingToGallery || _deck == null || _deck!.slides.isEmpty
-                ? null
-                : _saveSlideToGallery,
-          ),
-          IconButton(
-            tooltip: 'Ask Gemini',
+            tooltip: l10n.askGemini,
             icon: const Icon(Icons.auto_awesome_rounded),
             color: Theme.of(context).colorScheme.primary,
             onPressed: _deck == null || _deck!.slides.isEmpty ? null : _askGemini,
+          ),
+          PopupMenuButton<String>(
+            tooltip: l10n.more,
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (val) {
+              switch (val) {
+                case 'aspect':
+                  setState(() => _fillContainer = !_fillContainer);
+                  break;
+                case 'text_minus':
+                  setState(() {
+                    if (_fontScale > 0.8) _fontScale -= 0.1;
+                  });
+                  break;
+                case 'text_plus':
+                  setState(() {
+                    if (_fontScale < 1.8) _fontScale += 0.1;
+                  });
+                  break;
+                case 'gallery':
+                  if (!_isSavingToGallery && _deck != null && _deck!.slides.isNotEmpty) {
+                    _saveSlideToGallery();
+                  }
+                  break;
+                case 'share':
+                  _shareFile();
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'aspect',
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(_fillContainer ? Icons.aspect_ratio_rounded : Icons.fullscreen_rounded),
+                  title: Text(_fillContainer ? l10n.aspectRatioMode : l10n.expandedBigContainer),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'text_minus',
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.text_decrease_rounded),
+                  title: Text(l10n.smallerText),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'text_plus',
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.text_increase_rounded),
+                  title: Text(l10n.largerText),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'gallery',
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.add_photo_alternate_rounded),
+                  title: Text(l10n.saveSlideToGallery),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'share',
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.share_rounded),
+                  title: Text(l10n.share),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -405,7 +444,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
                 controller: _searchController,
                 autofocus: true,
                 decoration: InputDecoration(
-                  hintText: 'Search slide text (diacritic-friendly)...',
+                  hintText: l10n.searchPresentationHint,
                   prefixIcon: const Icon(Icons.search_rounded, size: 20),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
@@ -423,9 +462,9 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
                 onChanged: (val) => setState(() => _searchQuery = val.trim()),
               ),
             ),
-          Expanded(child: _buildBody()),
+          Expanded(child: _buildBody(l10n)),
           if (_deck != null && _deck!.slides.length > 1)
-            _buildBottomControls()
+            _buildBottomControls(l10n)
           else
             const SafeArea(top: false, child: SizedBox(height: 8)),
         ],
@@ -433,7 +472,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(AppLocalizations l10n) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -448,14 +487,14 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
               const SizedBox(height: 14),
               Text(_error!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _loadFile, child: const Text('Retry')),
+              FilledButton(onPressed: _loadFile, child: Text(l10n.retry)),
             ],
           ),
         ),
       );
     }
     if (_deck == null || _deck!.slides.isEmpty) {
-      return const Center(child: Text('This presentation has no slides.'));
+      return Center(child: Text(l10n.presentationHasNoSlides));
     }
 
     return PageView.builder(
@@ -465,20 +504,20 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
       itemBuilder: (context, index) {
         final slide = _deck!.slides[index];
         final isCurrent = index == _currentSlideIndex;
-        final card = _buildSlideCard(slide);
+        final card = _buildSlideCard(slide, l10n);
         return isCurrent ? RepaintBoundary(key: _slideCardKey, child: card) : card;
       },
     );
   }
 
-  Widget _buildSlideCard(PresentationSlide slide) {
+  Widget _buildSlideCard(PresentationSlide slide, AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
 
     if (_fillContainer) {
       // Big container mode: fills the entire available viewport height and width!
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        child: _buildCardContent(slide, scheme),
+        child: _buildCardContent(slide, scheme, l10n),
       );
     } else {
       // Classic 16:10 aspect ratio mode
@@ -487,14 +526,14 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
         child: Center(
           child: AspectRatio(
             aspectRatio: 16 / 10,
-            child: _buildCardContent(slide, scheme),
+            child: _buildCardContent(slide, scheme, l10n),
           ),
         ),
       );
     }
   }
 
-  Widget _buildCardContent(PresentationSlide slide, ColorScheme scheme) {
+  Widget _buildCardContent(PresentationSlide slide, ColorScheme scheme, AppLocalizations l10n) {
     final cleanSlideTitle = EncodingUtils.cleanDisplayName(slide.title);
 
     return Container(
@@ -536,7 +575,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Slide ${slide.slideNumber}',
+                  l10n.slideNumber(slide.slideNumber),
                   style: TextStyle(
                     fontSize: 11 * _fontScale,
                     fontWeight: FontWeight.bold,
@@ -559,8 +598,11 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.only(right: 10, top: 4),
-                            child: Icon(Icons.arrow_right_rounded, size: 20, color: scheme.primary),
+                            padding: const EdgeInsetsDirectional.only(end: 10, top: 4),
+                            child: Transform.flip(
+                              flipX: Directionality.of(context) == TextDirection.rtl,
+                              child: Icon(Icons.arrow_right_rounded, size: 20, color: scheme.primary),
+                            ),
                           ),
                           Expanded(
                             child: _highlightedText(
@@ -582,7 +624,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 24),
                       child: Center(
                         child: Text(
-                          '(Slide title only)',
+                          l10n.slideTitleOnly,
                           style: TextStyle(
                             fontStyle: FontStyle.italic,
                             color: scheme.outline,
@@ -643,7 +685,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
     );
   }
 
-  Widget _buildBottomControls() {
+  Widget _buildBottomControls(AppLocalizations l10n) {
     final hasPrev = _currentSlideIndex > 0;
     final hasNext = _deck != null && _currentSlideIndex < _deck!.slides.length - 1;
 
@@ -655,7 +697,10 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             IconButton.filledTonal(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+              icon: Transform.flip(
+                flipX: Directionality.of(context) == TextDirection.rtl,
+                child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+              ),
               onPressed: hasPrev
                   ? () => _pageController.previousPage(
                         duration: const Duration(milliseconds: 250),
@@ -663,13 +708,22 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
                       )
                   : null,
             ),
-            TextButton.icon(
-              icon: const Icon(Icons.grid_view_rounded, size: 16),
-              label: Text('Slide ${_currentSlideIndex + 1} of ${_deck!.slides.length}'),
-              onPressed: _openSlideOverview,
+            Flexible(
+              child: TextButton.icon(
+                icon: const Icon(Icons.grid_view_rounded, size: 16),
+                label: Text(
+                  l10n.slideXOfY(_currentSlideIndex + 1, _deck!.slides.length),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onPressed: _openSlideOverview,
+              ),
             ),
             IconButton.filledTonal(
-              icon: const Icon(Icons.arrow_forward_ios_rounded, size: 18),
+              icon: Transform.flip(
+                flipX: Directionality.of(context) == TextDirection.rtl,
+                child: const Icon(Icons.arrow_forward_ios_rounded, size: 18),
+              ),
               onPressed: hasNext
                   ? () => _pageController.nextPage(
                         duration: const Duration(milliseconds: 250),

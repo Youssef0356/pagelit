@@ -115,8 +115,9 @@ class EncodingUtils {
     return name.trim();
   }
 
-  /// Removes French and other European diacritics / accents for flexible search.
-  /// (e.g., "résumé" -> "resume", "français" -> "francais", "sœur" -> "soeur").
+  /// Removes French and European diacritics / accents and Arabic tashkeel /
+  /// character variants for flexible, natural multilingual search.
+  /// (e.g., "résumé" -> "resume", "français" -> "francais", "سَيَّارَة" -> "سياره").
   static String removeDiacritics(String input) {
     if (input.isEmpty) return input;
 
@@ -129,11 +130,24 @@ class EncodingUtils {
     }
 
     // Handle common French ligatures
-    return result
+    result = result
         .replaceAll('œ', 'oe')
         .replaceAll('Œ', 'OE')
         .replaceAll('æ', 'ae')
         .replaceAll('Æ', 'AE');
+
+    // Arabic Tashkeel (harakat / diacritics: Fathah, Dammah, Kasrah, Sukun, Shaddah, Tanwin)
+    result = result.replaceAll(RegExp(r'[\u064B-\u065F\u0670]'), '');
+    // Arabic Tatweel / Kashida
+    result = result.replaceAll('\u0640', '');
+    // Arabic Alef variants (أ, إ, آ, ٱ -> ا)
+    result = result.replaceAll(RegExp(r'[أإآٱ]'), 'ا');
+    // Arabic Taa Marbuta / Haa (ة -> ه) for flexible search
+    result = result.replaceAll('ة', 'ه');
+    // Arabic Alef Maksura / Yaa (ى -> ي)
+    result = result.replaceAll('ى', 'ي');
+
+    return result;
   }
 
   /// Determines whether [source] matches [query] using diacritic-insensitive

@@ -44,6 +44,14 @@ class AppTheme {
   const AppTheme._();
 
   static const String fontFamily = 'Poppins';
+  static const List<String> fontFamilyFallback = [
+    'Noto Sans Arabic',
+    'Roboto',
+    'Segoe UI',
+    'Tahoma',
+    'Arial',
+    'sans-serif',
+  ];
 
   static ThemeData light() => _build(Brightness.light);
   static ThemeData dark() => _build(Brightness.dark);
@@ -145,6 +153,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       fontFamily: fontFamily,
+      fontFamilyFallback: fontFamilyFallback,
       colorScheme: scheme,
       textTheme: textTheme,
       scaffoldBackgroundColor: scheme.surface,
@@ -298,6 +307,7 @@ class AppTheme {
     Color? color,
   }) => TextStyle(
     fontFamily: fontFamily,
+    fontFamilyFallback: fontFamilyFallback,
     fontSize: size,
     fontWeight: weight,
     height: height,

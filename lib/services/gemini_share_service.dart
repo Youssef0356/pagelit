@@ -7,6 +7,8 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../l10n/app_localizations.dart';
+
 /// Service to dispatch the current page image and prompt into Google Gemini
 /// via Android / platform Share Intent with fallbacks.
 class GeminiShareService {
@@ -24,13 +26,14 @@ class GeminiShareService {
     String? customPrompt,
   }) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
     final pixelRatio = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 3.0);
 
     try {
       final boundary = boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Viewer is not ready to capture for Gemini')),
+          SnackBar(content: Text(l10n.viewerNotReady)),
         );
         return;
       }
@@ -41,7 +44,7 @@ class GeminiShareService {
 
       if (byteData == null) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Could not capture page for Gemini')),
+          SnackBar(content: Text(l10n.couldNotGenerateSnapshot)),
         );
         return;
       }
@@ -51,10 +54,12 @@ class GeminiShareService {
         imageBytes: byteData.buffer.asUint8List(),
         pageTitle: pageTitle,
         customPrompt: customPrompt,
+        shareTitle: l10n.askGeminiTitle(pageTitle),
+        errorMessage: l10n.couldNotShareToGemini,
       );
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not share to Gemini: $e')),
+        SnackBar(content: Text(l10n.couldNotShareToGemini('$e'))),
       );
     }
   }
@@ -67,11 +72,14 @@ class GeminiShareService {
     String? customPrompt,
   }) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
     await _shareImageBytesWithMessenger(
       messenger: messenger,
       imageBytes: imageBytes,
       pageTitle: pageTitle,
       customPrompt: customPrompt,
+      shareTitle: l10n.askGeminiTitle(pageTitle),
+      errorMessage: l10n.couldNotShareToGemini,
     );
   }
 
@@ -79,6 +87,8 @@ class GeminiShareService {
     required ScaffoldMessengerState messenger,
     required Uint8List imageBytes,
     required String pageTitle,
+    required String shareTitle,
+    required String Function(String error) errorMessage,
     String? customPrompt,
   }) async {
     try {
@@ -97,13 +107,13 @@ class GeminiShareService {
         ShareParams(
           files: [XFile(file.path, mimeType: 'image/png')],
           text: promptText,
-          title: 'Ask Gemini: $pageTitle',
-          subject: 'Ask Gemini: $pageTitle',
+          title: shareTitle,
+          subject: shareTitle,
         ),
       );
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not share to Gemini: $e')),
+        SnackBar(content: Text(errorMessage('$e'))),
       );
     }
   }
