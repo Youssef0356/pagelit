@@ -459,8 +459,15 @@ class MainActivity : FlutterActivity() {
                     val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                     if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
                 }
-        }.getOrNull()
-        val safe = display
+        }.getOrNull() ?: uri.lastPathSegment
+        val decoded = runCatching {
+            if (display != null && display.contains("%")) {
+                java.net.URLDecoder.decode(display, "UTF-8")
+            } else {
+                display
+            }
+        }.getOrNull() ?: display
+        val safe = (decoded ?: display)
             ?.replace('/', '_')
             ?.replace('\\', '_')
             ?.trim()

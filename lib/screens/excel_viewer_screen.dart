@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../services/encoding_utils.dart';
 import '../services/excel_parser.dart';
+import '../services/gallery_saver.dart';
+import '../services/gemini_share_service.dart';
 
 
 class ExcelViewerScreen extends StatefulWidget {
@@ -21,9 +24,11 @@ class ExcelViewerScreen extends StatefulWidget {
 }
 
 class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
+  final GlobalKey _sheetTableKey = GlobalKey();
   ExcelWorkbook? _workbook;
   int _activeSheetIndex = 0;
   bool _isLoading = true;
+  bool _isSavingToGallery = false;
   String? _error;
   ExcelCell? _selectedCell;
   bool _isSearchOpen = false;
@@ -74,6 +79,35 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
     );
   }
 
+  Future<void> _saveSheetToGallery() async {
+    if (_workbook == null || _workbook!.sheets.isEmpty || _isSavingToGallery) return;
+    setState(() => _isSavingToGallery = true);
+    final cleanTitle = EncodingUtils.cleanDisplayName(widget.title);
+    final sheet = _workbook!.sheets[_activeSheetIndex];
+    try {
+      await GallerySaver.saveBoundaryToGallery(
+        context: context,
+        boundaryKey: _sheetTableKey,
+        baseName: 'Pagelit_${cleanTitle}_${sheet.name}',
+        successMessage: 'Sheet "${sheet.name}" view saved to gallery',
+      );
+    } finally {
+      if (mounted) setState(() => _isSavingToGallery = false);
+    }
+  }
+
+  Future<void> _askGemini() async {
+    if (_workbook == null || _workbook!.sheets.isEmpty) return;
+    final cleanTitle = EncodingUtils.cleanDisplayName(widget.title);
+    final sheet = _workbook!.sheets[_activeSheetIndex];
+    await GeminiShareService.shareBoundaryToGemini(
+      context: context,
+      boundaryKey: _sheetTableKey,
+      pageTitle: '$cleanTitle (Sheet "${sheet.name}")',
+      customPrompt: 'Please analyze this spreadsheet table, summarize trends, compute totals or key ratios, and highlight any anomalies.',
+    );
+  }
+
   String _colIndexToLetters(int index) {
     String res = '';
     int temp = index + 1;
@@ -112,7 +146,7 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                widget.title,
+                EncodingUtils.cleanDisplayName(widget.title),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -135,6 +169,25 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
             tooltip: 'Share',
             icon: const Icon(Icons.share_rounded),
             onPressed: _shareFile,
+          ),
+          IconButton(
+            tooltip: 'Save sheet view to gallery',
+            icon: _isSavingToGallery
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.add_photo_alternate_rounded),
+            onPressed: _isSavingToGallery || _workbook == null || _workbook!.sheets.isEmpty
+                ? null
+                : _saveSheetToGallery,
+          ),
+          IconButton(
+            tooltip: 'Ask Gemini',
+            icon: const Icon(Icons.auto_awesome_rounded),
+            color: Theme.of(context).colorScheme.primary,
+            onPressed: _workbook == null || _workbook!.sheets.isEmpty ? null : _askGemini,
           ),
         ],
       ),
@@ -167,8 +220,17 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
               ),
             ),
           Expanded(child: _buildBody()),
-          if (_selectedCell != null) _buildCellInspector(),
-          if (_workbook != null && _workbook!.sheets.length > 1) _buildSheetTabBar(),
+          if (_selectedCell != null || (_workbook != null && _workbook!.sheets.length > 1))
+            SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_selectedCell != null) _buildCellInspector(),
+                  if (_workbook != null && _workbook!.sheets.length > 1) _buildSheetTabBar(),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -208,12 +270,14 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
     final rowCount = sheet.maxRow.clamp(1, 2000);
     final colCount = sheet.maxCol.clamp(1, 100);
 
-    return InteractiveViewer(
-      constrained: false,
-      boundaryMargin: const EdgeInsets.all(200),
-      minScale: 0.5,
-      maxScale: 2.5,
-      child: Table(
+    return RepaintBoundary(
+      key: _sheetTableKey,
+      child: InteractiveViewer(
+        constrained: false,
+        boundaryMargin: const EdgeInsets.all(200),
+        minScale: 0.5,
+        maxScale: 2.5,
+        child: Table(
         defaultColumnWidth: const FixedColumnWidth(110),
         columnWidths: const {0: FixedColumnWidth(48)},
         border: TableBorder.all(color: scheme.outlineVariant, width: 0.8),
@@ -269,6 +333,7 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
             ),
         ],
       ),
+      ),
     );
   }
 
@@ -276,7 +341,7 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
     final cell = sheet.cell(r, c);
     final val = cell?.value ?? '';
     final isSelected = _selectedCell != null && _selectedCell!.row == r && _selectedCell!.col == c;
-    final isMatch = _searchQuery.isNotEmpty && val.toLowerCase().contains(_searchQuery);
+    final isMatch = _searchQuery.isNotEmpty && EncodingUtils.searchMatches(val, _searchQuery);
     final scheme = Theme.of(context).colorScheme;
 
     Color? bgColor;

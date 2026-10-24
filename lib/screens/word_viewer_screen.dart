@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 
 import 'package:share_plus/share_plus.dart';
 
+import '../services/encoding_utils.dart';
+import '../services/gallery_saver.dart';
+import '../services/gemini_share_service.dart';
 import '../services/reading_prefs.dart';
 import '../services/word_parser.dart';
 
@@ -22,8 +25,10 @@ class WordViewerScreen extends StatefulWidget {
 }
 
 class _WordViewerScreenState extends State<WordViewerScreen> {
+  final GlobalKey _documentViewKey = GlobalKey();
   WordDocument? _doc;
   bool _isLoading = true;
+  bool _isSavingToGallery = false;
   String? _error;
   double _fontScale = 1.0;
   bool _isSearchOpen = false;
@@ -74,6 +79,33 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
     );
   }
 
+  Future<void> _saveViewToGallery() async {
+    if (_doc == null || _doc!.blocks.isEmpty || _isSavingToGallery) return;
+    setState(() => _isSavingToGallery = true);
+    final cleanTitle = EncodingUtils.cleanDisplayName(widget.title);
+    try {
+      await GallerySaver.saveBoundaryToGallery(
+        context: context,
+        boundaryKey: _documentViewKey,
+        baseName: 'Pagelit_${cleanTitle}_doc',
+        successMessage: 'Document view saved to gallery',
+      );
+    } finally {
+      if (mounted) setState(() => _isSavingToGallery = false);
+    }
+  }
+
+  Future<void> _askGemini() async {
+    if (_doc == null || _doc!.blocks.isEmpty) return;
+    final cleanTitle = EncodingUtils.cleanDisplayName(widget.title);
+    await GeminiShareService.shareBoundaryToGemini(
+      context: context,
+      boundaryKey: _documentViewKey,
+      pageTitle: cleanTitle,
+      customPrompt: 'Please summarize, explain the main points, and answer questions about this document excerpt.',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -100,7 +132,7 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                widget.title,
+                EncodingUtils.cleanDisplayName(widget.title),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -137,6 +169,25 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
             tooltip: 'Share',
             icon: const Icon(Icons.share_rounded),
             onPressed: _shareFile,
+          ),
+          IconButton(
+            tooltip: 'Save view to gallery',
+            icon: _isSavingToGallery
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.add_photo_alternate_rounded),
+            onPressed: _isSavingToGallery || _doc == null || _doc!.blocks.isEmpty
+                ? null
+                : _saveViewToGallery,
+          ),
+          IconButton(
+            tooltip: 'Ask Gemini',
+            icon: const Icon(Icons.auto_awesome_rounded),
+            color: Theme.of(context).colorScheme.primary,
+            onPressed: _doc == null || _doc!.blocks.isEmpty ? null : _askGemini,
           ),
         ],
       ),
@@ -218,15 +269,21 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
           textColor = const Color(0xFFF0F0F0);
         }
 
-        return Container(
-          color: bgColor,
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
-            itemCount: _doc!.blocks.length,
-            itemBuilder: (context, index) {
-              final block = _doc!.blocks[index];
-              return _buildBlock(block, textColor, scheme);
-            },
+        return RepaintBoundary(
+          key: _documentViewKey,
+          child: Container(
+            color: bgColor,
+            child: SafeArea(
+              top: false,
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
+                itemCount: _doc!.blocks.length,
+                itemBuilder: (context, index) {
+                  final block = _doc!.blocks[index];
+                  return _buildBlock(block, textColor, scheme);
+                },
+              ),
+            ),
           ),
         );
       },
@@ -268,7 +325,7 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
               child: SelectableText.rich(
                 TextSpan(
                   children: block.spans.map((span) {
-                    final isMatch = _searchQuery.isNotEmpty && span.text.toLowerCase().contains(_searchQuery);
+                    final isMatch = _searchQuery.isNotEmpty && EncodingUtils.searchMatches(span.text, _searchQuery);
                     Color? spanColor = textColor;
                     if (span.colorHex != null && span.colorHex!.length == 6) {
                       final hex = int.tryParse(span.colorHex!, radix: 16);

@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'encoding_utils.dart';
 
 /// A document found on the device — either through "All files access" or inside a
 /// folder the user picked with the system folder picker.
@@ -27,8 +28,9 @@ class DevicePdf {
 
   factory DevicePdf.fromMap(Map<Object?, Object?> map) {
     final milliseconds = (map['modified'] as num?)?.toInt() ?? 0;
+    final rawName = map['name'] as String? ?? 'document';
     return DevicePdf(
-      name: map['name'] as String? ?? 'document',
+      name: EncodingUtils.cleanDisplayName(rawName),
       size: (map['size'] as num?)?.toInt() ?? 0,
       modified: DateTime.fromMillisecondsSinceEpoch(milliseconds),
       path: map['path'] as String?,

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
+import 'encoding_utils.dart';
 
 class PresentationSlide {
   const PresentationSlide({
@@ -32,7 +33,7 @@ class PresentationParser {
     final presRelsFile = archive.findFile('ppt/_rels/presentation.xml.rels');
     final slidePathsMap = <String, String>{};
     if (presRelsFile != null) {
-      final content = String.fromCharCodes(presRelsFile.content as List<int>);
+      final content = EncodingUtils.decodeDocumentBytes(presRelsFile.content as List<int>);
       final doc = XmlDocument.parse(content);
       for (final rel in doc.findAllElements('Relationship')) {
         final id = rel.getAttribute('Id');
@@ -51,7 +52,7 @@ class PresentationParser {
     final slidePaths = <String>[];
     final presFile = archive.findFile('ppt/presentation.xml');
     if (presFile != null) {
-      final content = String.fromCharCodes(presFile.content as List<int>);
+      final content = EncodingUtils.decodeDocumentBytes(presFile.content as List<int>);
       final doc = XmlDocument.parse(content);
       for (final sldId in doc.findAllElements('p:sldId')) {
         final rId = sldId.getAttribute('r:id');
@@ -83,7 +84,7 @@ class PresentationParser {
       final slideRelsFile = archive.findFile(relsPath);
       final mediaMap = <String, String>{};
       if (slideRelsFile != null) {
-        final relsXml = String.fromCharCodes(slideRelsFile.content as List<int>);
+        final relsXml = EncodingUtils.decodeDocumentBytes(slideRelsFile.content as List<int>);
         final relsDoc = XmlDocument.parse(relsXml);
         for (final rel in relsDoc.findAllElements('Relationship')) {
           final id = rel.getAttribute('Id');
@@ -95,7 +96,7 @@ class PresentationParser {
         }
       }
 
-      final slideXml = String.fromCharCodes(slideFile.content as List<int>);
+      final slideXml = EncodingUtils.decodeDocumentBytes(slideFile.content as List<int>);
       final slideDoc = XmlDocument.parse(slideXml);
 
       // Extract images

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
+import 'encoding_utils.dart';
 
 class ExcelCell {
   const ExcelCell({
@@ -58,7 +59,7 @@ class ExcelParser {
     // 1. Parse shared strings if present
     final sstFile = archive.findFile('xl/sharedStrings.xml');
     if (sstFile != null) {
-      final sstContent = String.fromCharCodes(sstFile.content as List<int>);
+      final sstContent = EncodingUtils.decodeDocumentBytes(sstFile.content as List<int>);
       final sstDoc = XmlDocument.parse(sstContent);
       for (final si in sstDoc.findAllElements('si')) {
         final tNodes = si.findAllElements('t');
@@ -72,14 +73,14 @@ class ExcelParser {
     final sheetEntries = <({String name, String sheetPath})>[];
 
     if (workbookFile != null) {
-      final wbContent = String.fromCharCodes(workbookFile.content as List<int>);
+      final wbContent = EncodingUtils.decodeDocumentBytes(workbookFile.content as List<int>);
       final wbDoc = XmlDocument.parse(wbContent);
 
       // Parse rels to map r:id -> target filename
       final relsFile = archive.findFile('xl/_rels/workbook.xml.rels');
       final relsMap = <String, String>{};
       if (relsFile != null) {
-        final relsContent = String.fromCharCodes(relsFile.content as List<int>);
+        final relsContent = EncodingUtils.decodeDocumentBytes(relsFile.content as List<int>);
         final relsDoc = XmlDocument.parse(relsContent);
         for (final rel in relsDoc.findAllElements('Relationship')) {
           final id = rel.getAttribute('Id');
@@ -117,7 +118,7 @@ class ExcelParser {
       final sheetFile = archive.findFile(entry.sheetPath);
       if (sheetFile == null) continue;
 
-      final sheetXml = String.fromCharCodes(sheetFile.content as List<int>);
+      final sheetXml = EncodingUtils.decodeDocumentBytes(sheetFile.content as List<int>);
       final sheetDoc = XmlDocument.parse(sheetXml);
 
       final cells = <String, ExcelCell>{};

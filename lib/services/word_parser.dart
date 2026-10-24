@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
+import 'encoding_utils.dart';
 
 sealed class WordBlock {
   const WordBlock();
@@ -64,7 +65,7 @@ class WordParser {
     final relsFile = archive.findFile('word/_rels/document.xml.rels');
     final mediaMap = <String, String>{};
     if (relsFile != null) {
-      final relsContent = String.fromCharCodes(relsFile.content as List<int>);
+      final relsContent = EncodingUtils.decodeDocumentBytes(relsFile.content as List<int>);
       final relsDoc = XmlDocument.parse(relsContent);
       for (final rel in relsDoc.findAllElements('Relationship')) {
         final id = rel.getAttribute('Id');
@@ -85,7 +86,7 @@ class WordParser {
       return const WordDocument(blocks: []);
     }
 
-    final docXml = String.fromCharCodes(docFile.content as List<int>);
+    final docXml = EncodingUtils.decodeDocumentBytes(docFile.content as List<int>);
     final doc = XmlDocument.parse(docXml);
     final body = doc.findAllElements('w:body').firstOrNull;
     if (body == null) return const WordDocument(blocks: []);

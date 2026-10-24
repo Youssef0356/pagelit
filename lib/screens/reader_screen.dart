@@ -1,12 +1,9 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
@@ -16,6 +13,9 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../ads/ad_banner.dart';
 import '../services/device_pdfs.dart';
+import '../services/encoding_utils.dart';
+import '../services/gallery_saver.dart';
+import '../services/gemini_share_service.dart';
 import '../services/reading_prefs.dart';
 import '../services/reading_progress.dart';
 import '../theme/app_theme.dart';
@@ -520,7 +520,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
   // ----------------------------------------------------------------- share
 
   String get _baseName =>
-      widget.title.replaceAll(RegExp(r'\.pdf$', caseSensitive: false), '');
+      EncodingUtils.cleanDisplayName(widget.title)
+          .replaceAll(RegExp(r'\.pdf$', caseSensitive: false), '');
 
   Future<void> _sharePdf() async {
     if (!_isLoaded || _isBusy) return;
@@ -584,47 +585,27 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Future<void> _savePageToGallery() async {
     if (!_isLoaded || _isBusy) return;
     setState(() => _isBusy = true);
-    final pixelRatio = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 3.0);
     try {
-      final boundary =
-          _viewerKey.currentContext?.findRenderObject()
-              as RenderRepaintBoundary?;
-      if (boundary == null) throw 'Viewer is not ready yet';
-      final ui.Image image = await boundary.toImage(pixelRatio: pixelRatio);
-      final ByteData? png = await image.toByteData(
-        format: ui.ImageByteFormat.png,
+      await GallerySaver.saveBoundaryToGallery(
+        context: context,
+        boundaryKey: _viewerKey,
+        baseName: 'Pagelit_${_baseName}_page_${_controller.pageNumber}',
+        successMessage: 'View of page ${_controller.pageNumber} saved to gallery',
       );
-      image.dispose();
-      if (png == null) throw 'Could not capture the page';
+    } finally {
+      if (mounted) setState(() => _isBusy = false);
+    }
+  }
 
-      final hasAccess = await Gal.hasAccess() || await Gal.requestAccess();
-      if (!hasAccess) throw 'Gallery permission denied';
-
-      await Gal.putImageBytes(
-        png.buffer.asUint8List(),
-        name: 'Pagelit_page_${_controller.pageNumber}',
+  Future<void> _askGemini() async {
+    if (!_isLoaded || _isBusy) return;
+    setState(() => _isBusy = true);
+    try {
+      await GeminiShareService.shareBoundaryToGemini(
+        context: context,
+        boundaryKey: _viewerKey,
+        pageTitle: '$_baseName (Page ${_controller.pageNumber})',
       );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'View of page ${_controller.pageNumber} saved to gallery',
-            ),
-          ),
-        );
-      }
-    } on GalException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save: ${e.type.message}')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Could not save: $e')));
-      }
     } finally {
       if (mounted) setState(() => _isBusy = false);
     }
@@ -733,7 +714,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      widget.title,
+                      EncodingUtils.cleanDisplayName(widget.title),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -768,6 +749,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   tooltip: 'Full screen',
                   icon: const Icon(Icons.fullscreen_rounded),
                   onPressed: _isLoaded ? _toggleImmersive : null,
+                ),
+                IconButton(
+                  tooltip: 'Ask Gemini',
+                  icon: const Icon(Icons.auto_awesome_rounded),
+                  color: Theme.of(context).colorScheme.primary,
+                  onPressed: _isLoaded && !_isBusy ? _askGemini : null,
                 ),
                 PopupMenuButton<String>(
                   tooltip: 'More',
@@ -815,6 +802,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       child: ListTile(
                         leading: Icon(Icons.add_photo_alternate_rounded),
                         title: Text('Save current view to gallery'),
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'gemini',
+                      child: ListTile(
+                        leading: Icon(Icons.auto_awesome_rounded),
+                        title: Text('Ask Gemini about this page'),
                       ),
                     ),
                     const PopupMenuDivider(),
@@ -867,6 +861,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         _saveAnnotatedCopy();
                       case 'gallery':
                         _savePageToGallery();
+                      case 'gemini':
+                        _askGemini();
                       case 'comfort_normal':
                         ReadingPrefs.setComfortMode(ComfortMode.normal);
                       case 'comfort_sepia':
@@ -1306,10 +1302,11 @@ class _OutlineSheet extends StatelessWidget {
   }
 
   Widget _buildTile(BuildContext context, PdfBookmark bm, int depth) {
+    final cleanTitle = EncodingUtils.cleanDisplayName(bm.title);
     if (bm.count > 0) {
       return ExpansionTile(
         tilePadding: EdgeInsets.only(left: 16.0 + depth * 16.0, right: 16),
-        title: Text(bm.title, style: const TextStyle(fontSize: 14)),
+        title: Text(cleanTitle, style: const TextStyle(fontSize: 14)),
         children: [
           for (int i = 0; i < bm.count; i++)
             _buildTile(context, bm[i], depth + 1),
@@ -1318,7 +1315,7 @@ class _OutlineSheet extends StatelessWidget {
     }
     return ListTile(
       contentPadding: EdgeInsets.only(left: 16.0 + depth * 16.0, right: 16),
-      title: Text(bm.title, style: const TextStyle(fontSize: 14)),
+      title: Text(cleanTitle, style: const TextStyle(fontSize: 14)),
       trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 13),
       onTap: () {
         Navigator.of(context).pop();

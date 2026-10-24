@@ -130,4 +130,63 @@ void main() {
     expect(deck.slides.first.title, 'Introduction to Pagelit');
     expect(deck.slides.first.bulletPoints, contains('Key Feature A'));
   });
+
+  test('Office parsers properly preserve French UTF-8 symbols', () async {
+    // 1. Word with French text
+    final wordArchive = Archive();
+    const docXml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Rapport d'activité : été 2026, présentation &amp; données reçues (français)</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>''';
+    final docBytes = utf8.encode(docXml);
+    wordArchive.addFile(ArchiveFile('word/document.xml', docBytes.length, docBytes));
+    final doc = await WordParser.parse(Uint8List.fromList(ZipEncoder().encode(wordArchive)));
+    final wordP = doc.blocks.first as WordParagraph;
+    expect(wordP.fullText, "Rapport d'activité : été 2026, présentation & données reçues (français)");
+
+    // 2. Excel with French text
+    final excelArchive = Archive();
+    const sstXml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <si><t>Chiffre d'affaires &amp; Bénéfice net</t></si>
+</sst>''';
+    const sheetXml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row r="1"><c r="A1" t="s"><v>0</v></c></row>
+  </sheetData>
+</worksheet>''';
+    final sstBytes = utf8.encode(sstXml);
+    final sheetBytes = utf8.encode(sheetXml);
+    excelArchive.addFile(ArchiveFile('xl/sharedStrings.xml', sstBytes.length, sstBytes));
+    excelArchive.addFile(ArchiveFile('xl/worksheets/sheet1.xml', sheetBytes.length, sheetBytes));
+    final wb = await ExcelParser.parse(Uint8List.fromList(ZipEncoder().encode(excelArchive)));
+    expect(wb.sheets.first.cell(0, 0)?.value, "Chiffre d'affaires & Bénéfice net");
+
+    // 3. Presentation with French text
+    final pptArchive = Archive();
+    const slideXml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:sp>
+        <p:nvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>
+        <p:txBody><a:p><a:r><a:t>Stratégie Numérique &amp; Déploiement</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:txBody><a:p><a:r><a:t>• Première étape : conformité &amp; sécurité</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:sld>''';
+    final slideBytes = utf8.encode(slideXml);
+    pptArchive.addFile(ArchiveFile('ppt/slides/slide1.xml', slideBytes.length, slideBytes));
+    final deck = await PresentationParser.parse(Uint8List.fromList(ZipEncoder().encode(pptArchive)));
+    expect(deck.slides.first.title, 'Stratégie Numérique & Déploiement');
+    expect(deck.slides.first.bulletPoints, contains('• Première étape : conformité & sécurité'));
+  });
 }

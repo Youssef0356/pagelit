@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import '../ads/ad_banner.dart';
 import '../services/device_pdfs.dart';
+import '../services/encoding_utils.dart';
 import '../services/reading_progress.dart';
 import '../services/recent_files.dart';
 import '../theme/app_theme.dart';
@@ -262,11 +263,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   String _nameFor(String path) {
     final raw = path.split(RegExp(r'[/\\]')).last;
-    try {
-      return Uri.decodeComponent(raw);
-    } on FormatException {
-      return raw;
-    }
+    return EncodingUtils.cleanDisplayName(raw);
   }
 
   Future<void> _openReader(String path) async {
@@ -413,7 +410,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<DevicePdf> get _filteredDevicePdfs {
     var list = _devicePdfs;
     if (_searchQuery.isNotEmpty) {
-      list = list.where((p) => p.name.toLowerCase().contains(_searchQuery)).toList();
+      list = list.where((p) => EncodingUtils.searchMatches(p.name, _searchQuery)).toList();
     }
     switch (_sortMode) {
       case SortMode.date:
@@ -429,7 +426,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<RecentFile> get _filteredRecents {
     var list = _recents;
     if (_searchQuery.isNotEmpty) {
-      list = list.where((p) => p.name.toLowerCase().contains(_searchQuery)).toList();
+      list = list.where((p) => EncodingUtils.searchMatches(p.name, _searchQuery)).toList();
     }
     switch (_sortMode) {
       case SortMode.date:

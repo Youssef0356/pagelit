@@ -12,6 +12,8 @@
         tools:ignore="ScopedStorage"/>
     <!-- Required for AdMob, sharing and online features in release builds -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Required for Google Play Billing in-app purchases ("Remove ads") -->
+    <uses-permission android:name="com.android.vending.BILLING"/>
     <application
         android:label="Pagelit"
         android:name="${applicationName}"
@@ -83,5 +85,7 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <package android:name="com.google.android.apps.bard"/>
+        <package android:name="com.google.android.googlequicksearchbox"/>
     </queries>
 </manifest>

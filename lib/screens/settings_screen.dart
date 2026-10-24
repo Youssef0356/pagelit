@@ -480,14 +480,47 @@ class _PremiumSectionState extends State<_PremiumSection> {
   Future<void> _buy() async {
     final started = await PremiumService.buy();
     if (started || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          PremiumService.priceLabel.value == null
-              ? 'Purchases are not available on this device.'
-              : 'Could not start the purchase. Please try again.',
+
+    if (kDebugMode && !PremiumService.isPremium.value) {
+      final shouldSimulate = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Play Billing Unavailable'),
+          content: const Text(
+            'Google Play Billing could not find the in-app product "remove_ads".\n\n'
+            'This is normal during local development or before the product is published on Google Play.\n\n'
+            'Would you like to activate Premium in test mode now?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Activate Premium'),
+            ),
+          ],
         ),
-      ),
+      );
+      if (shouldSimulate == true && mounted) {
+        await PremiumService.grantPremium(persist: true);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Premium activated! Ads are removed.')),
+          );
+        }
+      }
+      return;
+    }
+
+    final errorMessage = PremiumService.lastError.value ??
+        (PremiumService.priceLabel.value == null
+            ? 'Unable to connect to Google Play. Please check your internet connection and Google Play Services.'
+            : 'Could not start the purchase. Please try again.');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(errorMessage)),
     );
   }
 
@@ -564,7 +597,7 @@ class _PremiumSectionState extends State<_PremiumSection> {
                 dense: true,
                 title: const Text('Simulate premium (debug)'),
                 subtitle: const Text(
-                  'Preview the ad-free UI — not saved, resets on restart',
+                  'Enable ad-free mode for testing (persists on this device)',
                 ),
                 value: premium,
                 onChanged: PremiumService.debugSetPremium,

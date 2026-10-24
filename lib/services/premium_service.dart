@@ -1,8 +1,7 @@
 /// The one-time "Remove ads" purchase, billed through Google Play.
 ///
 /// Requires a one-time product with the id [PremiumService.productId]
-/// created in the Play Console (Monetise → Products → One-time products)
-/// and priced at $1.
+/// created in the Play Console (Monetise → Products → One-time products).
 ///
 /// Flow: [PremiumService.load] restores the cached flag before the first
 /// frame so ads are hidden instantly on launch; [PremiumService.init] then
@@ -35,6 +34,13 @@ class PremiumService {
   /// Product id configured in the Play Console.
   static const String productId = 'remove_ads';
 
+  /// Candidate product IDs to match against various Play Console setups.
+  static const Set<String> productIds = {
+    productId,
+    'com.the356company.pagelit.remove_ads',
+    'pagelit_remove_ads',
+  };
+
   /// Play Billing response name for ITEM_ALREADY_OWNED, as it appears in
   /// [IAPError.message] (e.g. "BillingResponse.itemAlreadyOwned").
   static const _itemAlreadyOwned = 'itemAlreadyOwned';
@@ -56,6 +62,7 @@ class PremiumService {
 
   static ProductDetails? _product;
   static Future<void>? _initialising;
+  static StreamSubscription<List<PurchaseDetails>>? _subscription;
 
   /// The purchase-stream batch currently being processed, so [restore] can
   /// wait for its own deliveries to be granted before reporting a result.
@@ -68,46 +75,88 @@ class PremiumService {
     isPremium.value = prefs.getBool(_ownedKey) ?? false;
   }
 
-  /// Connects to Google Play in the background. Safe to call once and only
-  /// once; repeats return the same future.
+  /// Connects to Google Play in the background. Safe to call repeatedly;
+  /// memoizes the first in-flight initialization.
   static Future<void> init() => _initialising ??= _init();
 
   static Future<void> _init() async {
+    await refreshProductDetails();
+  }
+
+  /// Actively queries Google Play Billing for the product details.
+  /// Safe to call on demand (e.g. when user taps "Remove ads").
+  static Future<bool> refreshProductDetails() async {
     try {
       final iap = InAppPurchase.instance;
-      // False on devices without the Play Store (some emulators, Huawei).
-      if (!await iap.isAvailable()) return;
-      iap.purchaseStream.listen(
+      final available = await iap.isAvailable();
+      if (!available) {
+        lastError.value = 'Google Play Billing is unavailable on this device.';
+        return false;
+      }
+
+      _subscription ??= iap.purchaseStream.listen(
         (purchases) => _processing = _onPurchases(purchases),
-        onError: (Object _) {},
+        onError: (Object err) {
+          isBuying.value = false;
+          lastError.value = 'Billing error: $err';
+        },
       );
-      final response = await iap.queryProductDetails({productId});
-      if (response.productDetails.isEmpty) return;
-      _product = response.productDetails.first;
-      priceLabel.value = _product!.price;
-    } catch (_) {
-      // Billing trouble must never crash the app; the UI simply shows no
-      // price and the purchase option does nothing.
+
+      final response = await iap.queryProductDetails(productIds);
+      if (response.error != null) {
+        lastError.value = response.error!.message;
+      }
+
+      if (response.productDetails.isNotEmpty) {
+        _product = response.productDetails.first;
+        priceLabel.value = _product!.price;
+        return true;
+      }
+    } catch (e) {
+      lastError.value = 'Billing error: $e';
     }
+    return false;
   }
 
   /// Launches the Play purchase sheet for "Remove ads".
   ///
+  /// Dynamically queries product details if not already loaded.
   /// Returns false when the flow could not start (billing unavailable, or
-  /// a purchase already in progress). Failures that happen after the sheet
-  /// opens arrive asynchronously through [lastError].
+  /// a purchase already in progress).
   static Future<bool> buy() async {
-    final product = _product;
-    if (product == null || isPremium.value || isBuying.value) return false;
+    if (isPremium.value || isBuying.value) return false;
+
     isBuying.value = true;
     try {
+      // If product details aren't loaded yet, try to load them now
+      if (_product == null) {
+        await refreshProductDetails();
+      }
+
+      final product = _product;
+      if (product == null) {
+        isBuying.value = false;
+        return false;
+      }
+
       final started = await InAppPurchase.instance.buyNonConsumable(
         purchaseParam: PurchaseParam(productDetails: product),
       );
-      if (!started) isBuying.value = false;
+
+      if (!started) {
+        isBuying.value = false;
+      } else {
+        // Auto-reset buying state after 30 seconds if dismissed out-of-band
+        Future<void>.delayed(const Duration(seconds: 30), () {
+          if (isBuying.value && !isPremium.value) {
+            isBuying.value = false;
+          }
+        });
+      }
       return started;
-    } catch (_) {
+    } catch (e) {
       isBuying.value = false;
+      lastError.value = 'Could not start purchase: $e';
       return false;
     }
   }
@@ -118,13 +167,25 @@ class PremiumService {
   /// processed, so the outcome is settled when this returns.
   static Future<RestoreOutcome> restore() async {
     if (isPremium.value) return RestoreOutcome.granted;
+    isBuying.value = true;
     try {
+      final iap = InAppPurchase.instance;
+      if (await iap.isAvailable()) {
+        _subscription ??= iap.purchaseStream.listen(
+          (purchases) => _processing = _onPurchases(purchases),
+          onError: (Object err) {
+            isBuying.value = false;
+            lastError.value = 'Billing error: $err';
+          },
+        );
+      }
       await InAppPurchase.instance.restorePurchases();
-    } catch (_) {
+    } catch (e) {
       isBuying.value = false;
-      lastError.value = 'Restore failed. Please try again.';
+      lastError.value = 'Restore failed: $e';
       return RestoreOutcome.failed;
     }
+
     // Restored purchases arrive on the stream asynchronously: wait one turn
     // of the event loop for the listener to be invoked, then for it to
     // finish granting.
@@ -142,7 +203,9 @@ class PremiumService {
         switch (purchase.status) {
           case PurchaseStatus.purchased:
           case PurchaseStatus.restored:
-            if (purchase.productID == productId) await _grant();
+            if (productIds.contains(purchase.productID) || purchase.productID == productId) {
+              await _grant();
+            }
           case PurchaseStatus.pending:
             isBuying.value = true;
           case PurchaseStatus.canceled:
@@ -164,26 +227,41 @@ class PremiumService {
           await InAppPurchase.instance.completePurchase(purchase);
         }
       } catch (_) {
-        // See above: swallow and move on to the next transaction.
+        // Swallow and move on to the next transaction.
       }
     }
   }
 
   static Future<void> _grant() async {
-    isPremium.value = true;
-    isBuying.value = false;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_ownedKey, true);
+    await grantPremium(persist: true);
   }
 
-  /// Debug-only: simulate ownership without touching Play or the persisted
-  /// cache, so the ad-free experience can be previewed on builds that cannot
-  /// reach the store (emulators, sideloaded debug installs). Not saved —
-  /// the flag resets on the next launch.
+  /// Grants premium status immediately, stops ads, and optionally saves to preferences.
+  static Future<void> grantPremium({bool persist = true}) async {
+    isPremium.value = true;
+    isBuying.value = false;
+    if (persist) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_ownedKey, true);
+    }
+  }
+
+  /// Revokes premium status immediately and removes the persisted preference.
+  static Future<void> revokePremium() async {
+    isPremium.value = false;
+    isBuying.value = false;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_ownedKey);
+  }
+
+  /// Debug helper: sets premium and persists it.
   static void debugSetPremium(bool value) {
     assert(kDebugMode, 'debugSetPremium must only be used in debug builds');
-    isPremium.value = value;
-    if (value) isBuying.value = false;
+    if (value) {
+      grantPremium(persist: true);
+    } else {
+      revokePremium();
+    }
   }
 
   /// Debug-only: back to a clean, non-premium state (used by tests).
@@ -192,6 +270,8 @@ class PremiumService {
     _initialising = null;
     _processing = null;
     _product = null;
+    _subscription?.cancel();
+    _subscription = null;
     isPremium.value = false;
     isBuying.value = false;
     priceLabel.value = null;
