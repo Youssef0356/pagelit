@@ -245,6 +245,23 @@ abstract class AppLocalizations {
   String couldNotSave(String error);
   String couldNotSaveToGallery(String error);
   String couldNotShareToGemini(String error);
+
+  // Splash & Onboarding
+  String get splashTagline;
+  String get welcomeToPagelit;
+  String get chooseThemeTitle;
+  String get chooseThemeSubtitle;
+  String get themeLightTitle;
+  String get themeLightSubtitle;
+  String get themeDarkTitle;
+  String get themeDarkSubtitle;
+  String get chooseLanguageTitle;
+  String get chooseLanguageSubtitle;
+  String get continueButton;
+  String get getStarted;
+  String get stepTheme;
+  String get stepLanguage;
+  String get previous;
 }
 
 class _AppLocalizationsDelegate
@@ -720,6 +737,40 @@ class _AppLocalizationsEn extends AppLocalizations {
   @override
   String couldNotShareToGemini(String error) =>
       "Could not share to Gemini: $error";
+
+  // Splash & Onboarding
+  @override
+  String get splashTagline => "Fast, clean & private document reader";
+  @override
+  String get welcomeToPagelit => "Welcome to Pagelit";
+  @override
+  String get chooseThemeTitle => "Choose appearance";
+  @override
+  String get chooseThemeSubtitle =>
+      "Select your preferred style. You can adjust this anytime in Settings.";
+  @override
+  String get themeLightTitle => "Light Mode";
+  @override
+  String get themeLightSubtitle => "Clean & crisp for daylight reading";
+  @override
+  String get themeDarkTitle => "Dark Mode";
+  @override
+  String get themeDarkSubtitle => "Gentle on your eyes in low light";
+  @override
+  String get chooseLanguageTitle => "Choose language";
+  @override
+  String get chooseLanguageSubtitle =>
+      "Select your preferred display language for the interface.";
+  @override
+  String get continueButton => "Continue";
+  @override
+  String get getStarted => "Get Started";
+  @override
+  String get stepTheme => "Theme";
+  @override
+  String get stepLanguage => "Language";
+  @override
+  String get previous => "Back";
 }
 
 // -----------------------------------------------------------------------------
@@ -1182,6 +1233,40 @@ class _AppLocalizationsFr extends AppLocalizations {
   @override
   String couldNotShareToGemini(String error) =>
       "Impossible de partager avec Gemini : $error";
+
+  // Splash & Onboarding
+  @override
+  String get splashTagline => "Lecture fluide, rapide et privée";
+  @override
+  String get welcomeToPagelit => "Bienvenue sur Pagelit";
+  @override
+  String get chooseThemeTitle => "Choisissez votre thème";
+  @override
+  String get chooseThemeSubtitle =>
+      "Sélectionnez votre style préféré. Vous pourrez le modifier à tout moment dans les Paramètres.";
+  @override
+  String get themeLightTitle => "Mode Clair";
+  @override
+  String get themeLightSubtitle => "Clair et net pour la lecture de jour";
+  @override
+  String get themeDarkTitle => "Mode Sombre";
+  @override
+  String get themeDarkSubtitle => "Agréable pour les yeux dans l'obscurité";
+  @override
+  String get chooseLanguageTitle => "Choisissez votre langue";
+  @override
+  String get chooseLanguageSubtitle =>
+      "Sélectionnez votre langue d'affichage préférée.";
+  @override
+  String get continueButton => "Continuer";
+  @override
+  String get getStarted => "Commencer";
+  @override
+  String get stepTheme => "Thème";
+  @override
+  String get stepLanguage => "Langue";
+  @override
+  String get previous => "Précédent";
 }
 
 // -----------------------------------------------------------------------------
@@ -1630,4 +1715,38 @@ class _AppLocalizationsAr extends AppLocalizations {
   @override
   String couldNotShareToGemini(String error) =>
       "تعذر إرسال الملف إلى Gemini: $error";
+
+  // Splash & Onboarding
+  @override
+  String get splashTagline => "قراءة سلسة، سريعة وبخصوصية تامة";
+  @override
+  String get welcomeToPagelit => "مرحباً بك في Pagelit";
+  @override
+  String get chooseThemeTitle => "اختر المظهر المفضل";
+  @override
+  String get chooseThemeSubtitle =>
+      "اختر الوضع الفاتح أو الداكن. يمكنك تغيير ذلك لاحقاً في أي وقت من الإعدادات.";
+  @override
+  String get themeLightTitle => "الوضع الفاتح";
+  @override
+  String get themeLightSubtitle => "مظهر ناصع ومريح للقراءة النهارية";
+  @override
+  String get themeDarkTitle => "الوضع الداكن";
+  @override
+  String get themeDarkSubtitle => "مريح وهادئ للعينين في الإضاءة الخافتة";
+  @override
+  String get chooseLanguageTitle => "اختر لغة التطبيق";
+  @override
+  String get chooseLanguageSubtitle =>
+      "حدد لغة العرض التي تفضل استخدام التطبيق بها.";
+  @override
+  String get continueButton => "متابعة";
+  @override
+  String get getStarted => "ابدأ القراءة";
+  @override
+  String get stepTheme => "المظهر";
+  @override
+  String get stepLanguage => "اللغة";
+  @override
+  String get previous => "السابق";
 }

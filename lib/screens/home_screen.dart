@@ -403,7 +403,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   List<DevicePdf> get _filteredDevicePdfs {
-    var list = _devicePdfs;
+    var list = List<DevicePdf>.from(_devicePdfs);
     if (_searchQuery.isNotEmpty) {
       list = list.where((p) => EncodingUtils.searchMatches(p.name, _searchQuery)).toList();
     }
@@ -419,7 +419,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   List<RecentFile> get _filteredRecents {
-    var list = _recents;
+    var list = List<RecentFile>.from(_recents);
     if (_searchQuery.isNotEmpty) {
       list = list.where((p) => EncodingUtils.searchMatches(p.name, _searchQuery)).toList();
     }

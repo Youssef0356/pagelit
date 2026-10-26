@@ -1,36 +1,37 @@
-# Pagelit Release Notes — v1.2.0 (Build 5)
+# Pagelit Release Notes — v1.3.0 (Build 6)
 
 ---
 
 ## 🇬🇧 English
 
-### What's New in v1.2.0
-* **New Languages Added**: Full, native localization for **Arabic (العربية)** and **French (Français)** alongside English.
-* **Complete RTL Support**: Full Right-to-Left layout support for Arabic, including directional UI mirroring, responsive alignments, and adapted navigation flows.
-* **Smart Arabic & French Search**: Enhanced search engine with automatic Tashkeel (diacritics), Tatweel, and letter normalization for Arabic, plus full accent-insensitive search for French.
-* **Overflow Protection & UI Hardening**: Optimized all screens (Reader, Settings, Presentation, Word, and Excel viewers) to prevent layout overflows across all screen sizes and display densities.
-* **Action Menus**: Compact and organized AppBar action menus in document viewers for a clean, distraction-free reading experience.
-* **Performance & Stability**: Upgraded dependency pipelines, optimized memory handling during document rendering, and refined localized byte units (Mo, Ko, Go).
+### What's New in v1.3.0
+* **New Animated Splash Screen**: Polished brand launch animation displaying the Pagelit glyph, localized tagline, and privacy indicator.
+* **First-Launch Onboarding**:
+  - Interactive appearance setup allowing new users to choose between Light Mode (White) and Dark Mode with live real-time theme preview.
+  - Interactive language selector (English, French, Arabic) with live RTL adaptation.
+* **Brand Harmony**: Native Android launch background matched to the official brand accent color.
+* **Performance & Stability**: Enhanced list sorting robustness and defensive handling across document libraries.
 
 ---
 
 ## 🇫🇷 Français
 
-### Nouveautés de la version 1.2.0
-* **Nouvelles langues disponibles** : Prise en charge native complète du **français** et de l'**arabe (العربية)** en plus de l'anglais.
-* **Interface soignée et sans coupures** : Optimisation de l'affichage sur tous les écrans (Paramètres, Lecteur, Visionneuses Word, Excel et Présentations) pour éviter tout débordement de texte.
-* **Recherche intelligente** : Moteur de recherche insensible aux accents et caractères diacritiques pour trouver instantanément vos documents et contenus.
-* **Menus d'actions simplifiés** : Barre d'outils allégée avec menu contextuel regroupant les actions secondaires pour une lecture immersive et épurée.
-* **Performances accrues** : Gestion optimisée de la mémoire lors de l'ouverture des fichiers volumineux et affichage précis des tailles de fichiers (Ko, Mo, Go).
+### Nouveautés de la version 1.3.0
+* **Nouvel écran de démarrage animé** : Animation élégante du logo Pagelit avec slogan localisé et indicateur de confidentialité.
+* **Configuration au premier lancement** :
+  - Choix du thème (Mode Clair ou Sombre) avec prévisualisation dynamique en direct.
+  - Sélection interactive de la langue (Français, Anglais, Arabe) avec adaptation instantanée de l'interface.
+* **Harmonie visuelle** : Harmonisation de l'écran de lancement natif Android avec la couleur emblématique de l'application.
+* **Stabilité et fluidité** : Optimisations du tri des documents et gestion renforcée des listes de fichiers.
 
 ---
 
 ## 🇸🇦 العربية
 
-### الجديد في الإصدار 1.2.0
-* **دعم كامل للغة العربية والفرنسية**: ترجمة عربية احترافية ودقيقة خالية من الترجمات الحرفية، مع تعريب شامل لكافة أقسام التطبيق ووحدات التخزين (بايت، ك.ب، م.ب، ج.ب).
-* **دعم مثالي لاتجاه الكتابة من اليمين إلى اليسار (RTL)**: تكيف كامل لواجهة المستخدم بما في ذلك اتجاه القوائم، وتدفق التنقل، ومحاذاة النصوص.
-* **بحث ذكي ودقيق**: محرك بحث يدعم إزالة علامات التشكيل، وحذف التطويل (الكشيدة)، وتوحيد أشكال الهمزات والألف، والتاء المربوطة/الهاء، والياء/الألف المقصورة لضمان العثور على الملفات والكلمات بسهولة تامة.
-* **معالجة مشاكل التجاوز (Overflow)**: إعادة تصميم متجاوبة لكافة الشاشات (الإعدادات، القارئ، عارض المستندات والعروض التقديمية والجداول) لتعمل بسلاسة على مختلف أحجام الشاشات دون أي أخطاء عرض.
-* **شريط أدوات منظم**: تجميع الأدوات الإضافية في قائمة منسدلة أنيقة لمنحك تجربة قراءة واسعة وخالية من المشتتات.
-* **تحسينات عامة في الأداء والاستقرار**: سرعة أعلى في فتح الملفات وإدارة الذاكرة بكفاءة.
+### الجديد في الإصدار 1.3.0
+* **شاشة بداية متحركة وجذابة**: مظهر افتتاحي أنيق يعرض شعار Pagelit مع شعار التطبيق المعرب ورمز الخصوصية.
+* **إعداد أولي مخصص عند الفتح لأول مرة**:
+  - اختيار المظهر (الوضع الفاتح أو الداكن) مع معاينة فورية ومباشرة للسمة على كامل الشاشة.
+  - اختيار لغة التطبيق المفضلة (العربية، الإنجليزية، الفرنسية) مع تطبيق فوري لتنسيق الواجهة من اليمين إلى اليسار (RTL).
+* **تناسق بصري كامل**: توافق تام بين شاشة الإقلاع الأصلية لنظام أندرويد وسمة التطبيق.
+* **تحسينات في الأداء والاستقرار**: تعزيز متانة فرز الملفات وسرعة تحميل المستندات.

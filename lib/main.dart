@@ -5,7 +5,9 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
 import 'services/locale_prefs.dart';
+import 'services/onboarding_prefs.dart';
 import 'services/premium_service.dart';
 import 'services/reading_prefs.dart';
 import 'services/theme_prefs.dart';
@@ -15,6 +17,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ThemePrefs.load();
   await LocalePrefs.load();
+  await OnboardingPrefs.load();
   await ReadingPrefs.load();
   // Cached flag, so the first frame already hides ads for premium users.
   await PremiumService.load();
@@ -53,7 +56,7 @@ class PagelitApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          home: const HomeScreen(),
+          home: const SplashScreen(),
         ),
       ),
     );
