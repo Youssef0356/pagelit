@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import 'package:share_plus/share_plus.dart';
@@ -27,6 +28,7 @@ class WordViewerScreen extends StatefulWidget {
 
 class _WordViewerScreenState extends State<WordViewerScreen> {
   final GlobalKey _documentViewKey = GlobalKey();
+  final ScrollController _scrollController = ScrollController();
   WordDocument? _doc;
   bool _isLoading = true;
   bool _isSavingToGallery = false;
@@ -44,6 +46,7 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -108,6 +111,103 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
     );
   }
 
+  void _openOutlineSheet() {
+    if (_doc == null) return;
+    final headings = <({int index, String text, int level})>[];
+    for (int i = 0; i < _doc!.blocks.length; i++) {
+      final block = _doc!.blocks[i];
+      if (block is WordParagraph && block.headingLevel != null && block.fullText.trim().isNotEmpty) {
+        headings.add((index: i, text: block.fullText.trim(), level: block.headingLevel!));
+      }
+    }
+
+    if (headings.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.noTableOfContents)),
+      );
+      return;
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Text(
+                context.l10n.tableOfContents,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+            const Divider(),
+            Expanded(
+              child: ListView.builder(
+                itemCount: headings.length,
+                itemBuilder: (context, idx) {
+                  final h = headings[idx];
+                  final indent = (h.level - 1) * 16.0;
+                  return ListTile(
+                    contentPadding: EdgeInsetsDirectional.only(start: 20 + indent, end: 20),
+                    leading: Icon(
+                      h.level == 1 ? Icons.bookmark_rounded : Icons.subdirectory_arrow_right_rounded,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    title: Text(
+                      h.text,
+                      style: TextStyle(
+                        fontWeight: h.level == 1 ? FontWeight.bold : FontWeight.w500,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _scrollController.animateTo(
+                        (h.index * 68.0).clamp(0.0, _scrollController.position.maxScrollExtent),
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _viewImage(Uint8List bytes) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.memory(bytes, fit: BoxFit.contain),
+              ),
+            ),
+            IconButton.filled(
+              icon: const Icon(Icons.close_rounded, color: Colors.white),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -143,6 +243,11 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: l10n.tableOfContents,
+            icon: const Icon(Icons.format_list_bulleted_rounded),
+            onPressed: _openOutlineSheet,
+          ),
           IconButton(
             tooltip: l10n.search,
             icon: Icon(_isSearchOpen ? Icons.search_off_rounded : Icons.search_rounded),
@@ -303,16 +408,39 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
         return RepaintBoundary(
           key: _documentViewKey,
           child: Container(
-            color: bgColor,
-            child: SafeArea(
-              top: false,
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
-                itemCount: _doc!.blocks.length,
-                itemBuilder: (context, index) {
-                  final block = _doc!.blocks[index];
-                  return _buildBlock(block, textColor, scheme);
-                },
+            color: comfort == ComfortMode.normal
+                ? scheme.surfaceContainerLow
+                : bgColor,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 820),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: scheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 18,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 48),
+                    itemCount: _doc!.blocks.length,
+                    itemBuilder: (context, index) {
+                      final block = _doc!.blocks[index];
+                      return _buildBlock(block, textColor, scheme);
+                    },
+                  ),
+                ),
               ),
             ),
           ),
@@ -329,15 +457,47 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
           2 => 20.0 * _fontScale,
           _ => 17.0 * _fontScale,
         };
+        final isH1 = block.headingLevel == 1;
+
         return Padding(
-          padding: const EdgeInsets.only(top: 18, bottom: 8),
-          child: Text(
-            block.fullText,
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
+          padding: EdgeInsets.only(top: isH1 ? 24 : 16, bottom: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (isH1)
+                    Container(
+                      width: 4,
+                      height: 22 * _fontScale,
+                      margin: const EdgeInsetsDirectional.only(end: 10),
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  Expanded(
+                    child: Text(
+                      block.fullText,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: isH1 ? -0.3 : -0.1,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (isH1) ...[
+                const SizedBox(height: 6),
+                Divider(
+                  height: 1,
+                  color: scheme.primary.withValues(alpha: 0.25),
+                ),
+              ],
+            ],
           ),
         );
       }
@@ -349,8 +509,12 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
           children: [
             if (block.isBullet)
               Padding(
-                padding: const EdgeInsetsDirectional.only(end: 8, top: 4),
-                child: Text('•', style: TextStyle(fontSize: 16 * _fontScale, color: textColor)),
+                padding: const EdgeInsetsDirectional.only(end: 10, top: 4),
+                child: Icon(
+                  Icons.circle,
+                  size: 7 * _fontScale,
+                  color: scheme.primary,
+                ),
               ),
             Expanded(
               child: SelectableText.rich(
@@ -384,37 +548,109 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
       );
     } else if (block is WordTableBlock) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Table(
-            defaultColumnWidth: const IntrinsicColumnWidth(),
-            border: TableBorder.all(color: scheme.outlineVariant),
-            children: block.rows.map((row) {
-              return TableRow(
-                children: row.map((cellText) {
-                  return Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Text(
-                      cellText,
-                      style: TextStyle(fontSize: 13.0 * _fontScale, color: textColor),
-                    ),
-                  );
-                }).toList(),
-              );
-            }).toList(),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Container(
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: scheme.outlineVariant.withValues(alpha: 0.6),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Table(
+              defaultColumnWidth: const IntrinsicColumnWidth(),
+              border: TableBorder(
+                horizontalInside: BorderSide(
+                  color: scheme.outlineVariant.withValues(alpha: 0.4),
+                  width: 0.8,
+                ),
+                verticalInside: BorderSide(
+                  color: scheme.outlineVariant.withValues(alpha: 0.25),
+                  width: 0.8,
+                ),
+              ),
+              children: block.rows.asMap().entries.map((entry) {
+                final isHeader = entry.key == 0;
+                final isEvenRow = entry.key % 2 == 0;
+                final rowBg = isHeader
+                    ? scheme.surfaceContainerHigh
+                    : (isEvenRow ? scheme.surface : scheme.surfaceContainerLowest);
+
+                return TableRow(
+                  decoration: BoxDecoration(color: rowBg),
+                  children: entry.value.map((cellText) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      child: Text(
+                        cellText,
+                        style: TextStyle(
+                          fontSize: 13.0 * _fontScale,
+                          fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
+                          color: textColor,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                );
+              }).toList(),
+            ),
           ),
         ),
       );
     } else if (block is WordImageBlock) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.memory(
-            block.bytes,
-            fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: InkWell(
+          onTap: () => _viewImage(block.bytes),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: 0.6),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                Image.memory(
+                  block.bytes,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+                Container(
+                  margin: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.zoom_in_rounded,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );

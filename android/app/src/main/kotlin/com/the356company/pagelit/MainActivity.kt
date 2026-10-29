@@ -18,6 +18,8 @@ import android.print.PrintManager
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.provider.Settings
+import android.content.pm.PackageManager
+import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -111,6 +113,14 @@ class MainActivity : FlutterActivity() {
                     "printFile" -> {
                         val path = call.argument<String>("path")
                         printDocument(path, result)
+                    }
+                    "openGemini" -> {
+                        val filePath = call.argument<String>("filePath")
+                        val prompt = call.argument<String>("prompt") ?: ""
+                        result.success(openGemini(filePath, prompt))
+                    }
+                    "isGeminiInstalled" -> {
+                        result.success(isGeminiInstalled())
                     }
                     else -> result.notImplemented()
                 }
@@ -394,6 +404,54 @@ class MainActivity : FlutterActivity() {
         }
         printManager.print(file.name, adapter, PrintAttributes.Builder().build())
         result.success(true)
+    }
+
+    // --------------------------------------------------------------- gemini
+
+    /** Checks whether the official Google Gemini app is installed. */
+    private fun isGeminiInstalled(): Boolean {
+        return try {
+            packageManager.getPackageInfo("com.google.android.apps.bard", 0)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Opens Google Gemini directly with the given image and prompt.
+     * Returns true if successfully launched, false if Gemini app is not installed.
+     */
+    private fun openGemini(filePath: String?, prompt: String): Boolean {
+        if (!isGeminiInstalled()) {
+            return false
+        }
+        return try {
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "image/png"
+                if (filePath != null) {
+                    val file = File(filePath)
+                    if (file.exists()) {
+                        val uri = FileProvider.getUriForFile(
+                            this@MainActivity,
+                            "${applicationContext.packageName}.fileprovider",
+                            file
+                        )
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                }
+                if (prompt.isNotEmpty()) {
+                    putExtra(Intent.EXTRA_TEXT, prompt)
+                }
+                setPackage("com.google.android.apps.bard")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     // --------------------------------------------------------------- deeplinks

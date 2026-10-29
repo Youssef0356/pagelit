@@ -237,18 +237,92 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
                 onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
               ),
             ),
+          _buildFormulaBar(l10n),
           Expanded(child: _buildBody(l10n)),
-          if (_selectedCell != null || (_workbook != null && _workbook!.sheets.length > 1))
+          if (_workbook != null && _workbook!.sheets.length > 1)
             SafeArea(
               top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_selectedCell != null) _buildCellInspector(l10n),
-                  if (_workbook != null && _workbook!.sheets.length > 1) _buildSheetTabBar(),
-                ],
+              child: _buildSheetTabBar(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormulaBar(AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
+    final cell = _selectedCell;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh.withValues(alpha: 0.8),
+        border: Border(
+          bottom: BorderSide(
+            color: scheme.outlineVariant.withValues(alpha: 0.6),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: cell != null ? scheme.primary : scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              cell?.coordinate ?? 'fx',
+              style: TextStyle(
+                color: cell != null ? Colors.white : scheme.outline,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
               ),
             ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              cell != null && cell.value.isNotEmpty
+                  ? (cell.formula != null ? '=${cell.formula} (${cell.value})' : cell.value)
+                  : 'Tap any cell to inspect',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontFamily: 'monospace',
+                color: cell != null && cell.value.isNotEmpty
+                    ? scheme.onSurface
+                    : scheme.outline,
+              ),
+            ),
+          ),
+          if (cell != null && cell.value.isNotEmpty) ...[
+            IconButton(
+              icon: const Icon(Icons.copy_rounded, size: 18),
+              tooltip: MaterialLocalizations.of(context).copyButtonLabel,
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: cell.value));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(l10n.copiedCellText),
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
+              },
+            ),
+            IconButton(
+              icon: Icon(Icons.auto_awesome_rounded, size: 18, color: scheme.primary),
+              tooltip: l10n.askGemini,
+              onPressed: () {
+                GeminiShareService.askGeminiAboutText(
+                  context: context,
+                  selectedText: 'Cell ${cell.coordinate}: ${cell.value}',
+                  pageTitle: widget.title,
+                );
+              },
+            ),
+          ],
         ],
       ),
     );
@@ -288,6 +362,18 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
     final rowCount = sheet.maxRow.clamp(1, 2000);
     final colCount = sheet.maxCol.clamp(1, 100);
 
+    final Map<int, TableColumnWidth> colWidths = {0: const FixedColumnWidth(48)};
+    for (int c = 0; c < colCount; c++) {
+      int maxLen = _colIndexToLetters(c).length;
+      final checkRows = rowCount.clamp(0, 30);
+      for (int r = 0; r < checkRows; r++) {
+        final len = sheet.cell(r, c)?.value.length ?? 0;
+        if (len > maxLen) maxLen = len;
+      }
+      final width = (maxLen * 8.5 + 28.0).clamp(72.0, 240.0);
+      colWidths[c + 1] = FixedColumnWidth(width);
+    }
+
     return RepaintBoundary(
       key: _sheetTableKey,
       child: InteractiveViewer(
@@ -296,63 +382,79 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
         minScale: 0.5,
         maxScale: 2.5,
         child: Table(
-        defaultColumnWidth: const FixedColumnWidth(110),
-        columnWidths: const {0: FixedColumnWidth(48)},
-        border: TableBorder.all(color: scheme.outlineVariant, width: 0.8),
-        children: [
-          // Header Row: A, B, C...
-          TableRow(
-            decoration: BoxDecoration(color: scheme.surfaceContainerHigh),
-            children: [
-              Container(
-                alignment: Alignment.center,
-                height: 32,
-                child: const Text('#', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-              ),
-              for (int c = 0; c < colCount; c++)
+          defaultColumnWidth: const FixedColumnWidth(110),
+          columnWidths: colWidths,
+          border: TableBorder.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.7),
+            width: 0.8,
+          ),
+          children: [
+            // Header Row: A, B, C...
+            TableRow(
+              decoration: BoxDecoration(color: scheme.surfaceContainerHigh),
+              children: [
                 Container(
                   alignment: Alignment.center,
                   height: 32,
                   child: Text(
-                    _colIndexToLetters(c),
+                    '#',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
-                      color: scheme.onSurface,
+                      color: scheme.primary,
                     ),
                   ),
                 ),
-            ],
-          ),
-          // Data Rows
-          for (int r = 0; r < rowCount; r++)
-            TableRow(
-              decoration: BoxDecoration(
-                color: r.isEven ? scheme.surface : scheme.surfaceContainerLowest,
-              ),
-              children: [
-                // Row Header
-                Container(
-                  alignment: Alignment.center,
-                  height: 36,
-                  color: scheme.surfaceContainerHigh,
-                  child: Text(
-                    '${r + 1}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: scheme.onSurfaceVariant,
+                for (int c = 0; c < colCount; c++)
+                  Container(
+                    alignment: Alignment.center,
+                    height: 32,
+                    child: Text(
+                      _colIndexToLetters(c),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: scheme.onSurface,
+                      ),
                     ),
                   ),
-                ),
-                // Cells
-                for (int c = 0; c < colCount; c++) _buildCellWidget(sheet, r, c),
               ],
             ),
-        ],
-      ),
+            // Data Rows
+            for (int r = 0; r < rowCount; r++)
+              TableRow(
+                decoration: BoxDecoration(
+                  color: r.isEven ? scheme.surface : scheme.surfaceContainerLowest,
+                ),
+                children: [
+                  // Row Header
+                  Container(
+                    alignment: Alignment.center,
+                    height: 36,
+                    color: scheme.surfaceContainerHigh.withValues(alpha: 0.7),
+                    child: Text(
+                      '${r + 1}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  // Cells
+                  for (int c = 0; c < colCount; c++) _buildCellWidget(sheet, r, c),
+                ],
+              ),
+          ],
+        ),
       ),
     );
+  }
+
+  bool _isNumericValue(String text) {
+    if (text.isEmpty) return false;
+    final cleaned = text.replaceAll(RegExp(r'[\$,€,£,¥,%,\s]'), '');
+    return double.tryParse(cleaned) != null;
   }
 
   Widget _buildCellWidget(ExcelSheet sheet, int r, int c) {
@@ -361,6 +463,7 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
     final isSelected = _selectedCell != null && _selectedCell!.row == r && _selectedCell!.col == c;
     final isMatch = _searchQuery.isNotEmpty && EncodingUtils.searchMatches(val, _searchQuery);
     final scheme = Theme.of(context).colorScheme;
+    final isNumeric = _isNumericValue(val);
 
     Color? bgColor;
     if (isSelected) {
@@ -376,9 +479,11 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
       },
       child: Container(
         height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         color: bgColor,
-        alignment: AlignmentDirectional.centerStart,
+        alignment: isNumeric
+            ? AlignmentDirectional.centerEnd
+            : AlignmentDirectional.centerStart,
         child: Text(
           val,
           maxLines: 1,
@@ -393,92 +498,13 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
     );
   }
 
-  Widget _buildCellInspector(AppLocalizations l10n) {
-    final cell = _selectedCell!;
-    final scheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainer,
-        border: Border(top: BorderSide(color: scheme.outlineVariant)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: scheme.primary,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              cell.coordinate,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (cell.formula != null)
-                  Text(
-                    'fx: =${cell.formula}',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 11,
-                      color: scheme.outline,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                SelectableText(
-                  cell.value.isEmpty ? l10n.emptyCell : cell.value,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: cell.value.isEmpty ? scheme.outline : scheme.onSurface,
-                  ),
-                  maxLines: 2,
-                ),
-              ],
-            ),
-          ),
-          if (cell.value.isNotEmpty)
-            IconButton(
-              tooltip: l10n.copyValue,
-              icon: const Icon(Icons.copy_rounded, size: 20),
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: cell.value));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(l10n.copiedCellText),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
-          IconButton(
-            tooltip: l10n.dismiss,
-            icon: const Icon(Icons.close_rounded, size: 20),
-            onPressed: () => setState(() => _selectedCell = null),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSheetTabBar() {
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      height: 48,
-      color: scheme.surfaceContainerLowest,
+      height: 52,
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: scheme.outlineVariant)),
+        color: scheme.surfaceContainerLowest,
+        border: Border(top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.6))),
       ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
@@ -488,11 +514,26 @@ class _ExcelViewerScreenState extends State<ExcelViewerScreen> {
         itemBuilder: (context, idx) {
           final isSelected = idx == _activeSheetIndex;
           final sheet = _workbook!.sheets[idx];
-          return ChoiceChip(
-            label: Text(sheet.name),
-            selected: isSelected,
-            onSelected: (selected) {
-              if (selected) {
+          return ActionChip(
+            avatar: Icon(
+              Icons.table_chart_rounded,
+              size: 16,
+              color: isSelected ? scheme.onPrimaryContainer : scheme.outline,
+            ),
+            backgroundColor: isSelected ? scheme.primaryContainer : scheme.surfaceContainerHigh,
+            side: BorderSide(
+              color: isSelected ? scheme.primary : scheme.outlineVariant.withValues(alpha: 0.5),
+              width: isSelected ? 1.5 : 1.0,
+            ),
+            label: Text(
+              sheet.name,
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? scheme.onPrimaryContainer : scheme.onSurface,
+              ),
+            ),
+            onPressed: () {
+              if (!isSelected) {
                 HapticFeedback.selectionClick();
                 setState(() {
                   _activeSheetIndex = idx;

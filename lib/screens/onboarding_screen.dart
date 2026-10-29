@@ -445,7 +445,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 /// Interactive card for picking Light (White) or Dark mode with preview.
 class _ThemeSelectionCard extends StatelessWidget {
   const _ThemeSelectionCard({
-    super.key,
     required this.isSelected,
     required this.isDarkThemeCard,
     required this.title,

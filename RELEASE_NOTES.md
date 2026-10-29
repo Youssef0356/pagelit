@@ -1,3 +1,40 @@
+# Pagelit Release Notes — v1.3.1 (Build 7)
+
+---
+
+## 🇬🇧 English
+
+### What's New in v1.3.1
+* **Precision Text Highlighting**: Redesigned PDF text selection with draggable pin-point handles and a streamlined floating toolbar (Highlight, Underline, Strikethrough, Copy, Ask Gemini).
+* **Direct Gemini Share**: One-tap direct sharing to the Gemini app with Android FileProvider without intermediate chooser prompts, plus web fallback.
+* **Redesigned PowerPoint Slide Viewer**: Slide counter badge, thought-card bullet points, responsive text scaling, and tap-to-zoom slide image dialogs.
+* **Enhanced Word Document Viewer**: Centered authentic paper page layout, table-of-contents outline drawer, polished headings, zebra-striped tables, and tap-to-zoom images.
+* **Upgraded Excel Spreadsheet Viewer**: Formula & coordinate inspector bar (`fx`), dynamic content-based column widths, smart number/text alignment, and modern sheet tabs.
+
+---
+
+## 🇫🇷 Français
+
+### Nouveautés de la version 1.3.1
+* **Surlignage de texte ultra-précis** : Sélection de texte optimisée dans les PDF avec poignées de réglage et barre d'actions rapide (Surligner, Souligner, Barrer, Copier, Demander à Gemini).
+* **Partage direct vers Gemini** : Envoi direct en un clic vers l'application Gemini via Android FileProvider sans boîte de dialogue intermédiaire, avec solution de secours web.
+* **Nouvelle visionneuse de présentations PowerPoint** : Badge de diapositive, cartes d'idées avec puces visuelles, adaptation dynamique du texte et zoom plein écran sur les images.
+* **Visionneuse de documents Word améliorée** : Disposition sur feuille centrée élégante, volet de navigation dans les titres (Table des matières), tableaux zébrés et zoom sur les images.
+* **Visionneuse de feuilles de calcul Excel enrichie** : Barre de formule et de coordonnées (`fx`), largeurs de colonnes automatiques adaptatives, alignement intelligent et onglets modernes.
+
+---
+
+## 🇸🇦 العربية
+
+### الجديد في الإصدار 1.3.1
+* **تحديد وتمييز النصوص بدقة متناهية**: نظام تحديد نصوص PDF المحسّن مع مقابض تحكم دقيقة وشريط أدوات سريع (تمييز، تسطير، شطب، نسخ، وسؤال Gemini).
+* **مشاركة مباشرة بنقرة واحدة إلى Gemini**: إرسال المستندات مباشرة إلى تطبيق Gemini عبر موفر الملفات FileProvider دون القوائم الوسيطة، مع دعم متصفح الويب كبديل.
+* **عرض شرائح PowerPoint بحلة جديدة**: شارة رقم الشريحة، بطاقات نقاط منسقة، قياس خط مرن، وإمكانية تكبير صور الشرائح بلمسة واحدة.
+* **تجربة قراءة مطورة لمستندات Word**: تنسيق ورقي أنيق ممركز، فهرس تنقل تفاعلي لعناوين المستند، جداول مخططة واضحة، ومعاينة مكبرة للصور.
+* **عرض متقدم لجداول Excel**: شريط فحص صيغ وخلايا الجدول (`fx`)، عرض تلقائي ذكي للأعمدة، محاذاة تلقائية للأرقام والنصوص، وأشرطة تبويب أوراق حديثة.
+
+---
+
 # Pagelit Release Notes — v1.3.0 (Build 6)
 
 ---

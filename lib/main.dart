@@ -4,7 +4,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'l10n/app_localizations.dart';
-import 'screens/home_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/locale_prefs.dart';
 import 'services/onboarding_prefs.dart';

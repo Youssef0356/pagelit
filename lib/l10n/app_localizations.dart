@@ -245,6 +245,10 @@ abstract class AppLocalizations {
   String couldNotSave(String error);
   String couldNotSaveToGallery(String error);
   String couldNotShareToGemini(String error);
+  String get copiedToClipboard;
+  String get precisionHighlightHint;
+  String get geminiOpeningInBrowser;
+  String get getGeminiApp;
 
   // Splash & Onboarding
   String get splashTagline;
@@ -737,6 +741,17 @@ class _AppLocalizationsEn extends AppLocalizations {
   @override
   String couldNotShareToGemini(String error) =>
       "Could not share to Gemini: $error";
+
+  @override
+  String get copiedToClipboard => "Copied to clipboard";
+  @override
+  String get precisionHighlightHint =>
+      "Tip: Long-press text to adjust with precision handles";
+  @override
+  String get geminiOpeningInBrowser =>
+      "Opening Gemini in browser. Prompt copied to clipboard!";
+  @override
+  String get getGeminiApp => "Get App";
 
   // Splash & Onboarding
   @override
@@ -1234,6 +1249,17 @@ class _AppLocalizationsFr extends AppLocalizations {
   String couldNotShareToGemini(String error) =>
       "Impossible de partager avec Gemini : $error";
 
+  @override
+  String get copiedToClipboard => "Copié dans le presse-papiers";
+  @override
+  String get precisionHighlightHint =>
+      "Astuce : Appui long pour ajuster avec les poignées";
+  @override
+  String get geminiOpeningInBrowser =>
+      "Ouverture de Gemini dans le navigateur. Requête copiée !";
+  @override
+  String get getGeminiApp => "Obtenir l'app";
+
   // Splash & Onboarding
   @override
   String get splashTagline => "Lecture fluide, rapide et privée";
@@ -1715,6 +1741,17 @@ class _AppLocalizationsAr extends AppLocalizations {
   @override
   String couldNotShareToGemini(String error) =>
       "تعذر إرسال الملف إلى Gemini: $error";
+
+  @override
+  String get copiedToClipboard => "تم النسخ إلى الحافظة";
+  @override
+  String get precisionHighlightHint =>
+      "تلميح: اضغط مطولاً للضبط الدقيق بالمقابض";
+  @override
+  String get geminiOpeningInBrowser =>
+      "جارٍ فتح Gemini في المتصفح. تم نسخ الطلب إلى الحافظة!";
+  @override
+  String get getGeminiApp => "تثبيت التطبيق";
 
   // Splash & Onboarding
   @override

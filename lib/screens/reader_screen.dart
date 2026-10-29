@@ -89,16 +89,23 @@ class _ReaderScreenState extends State<ReaderScreen> {
     Colors.red,
   ];
 
+  final GlobalKey<SfPdfViewerState> _pdfViewerStateKey =
+      GlobalKey<SfPdfViewerState>();
+  String? _selectedText;
+  Rect? _selectedRegion;
+
   late SfPdfViewer _viewer;
 
   void _initViewer() {
     _viewer = SfPdfViewer.file(
       File(widget.filePath),
-      key: ValueKey('viewer_${widget.filePath}_${_password ?? ""}_${ReadingPrefs.scrollDirection.value}'),
+      key: _pdfViewerStateKey,
       controller: _controller,
       password: _password,
       pageLayoutMode: ReadingPrefs.layoutMode.value,
       scrollDirection: ReadingPrefs.scrollDirection.value,
+      canShowTextSelectionMenu: false,
+      onTextSelectionChanged: _onTextSelectionChanged,
       onDocumentLoaded: (details) {
         _controller.annotationSettings.author = 'Pagelit';
         _applyColorToSettings(_color);
@@ -120,7 +127,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
         }
       },
       onPageChanged: (details) {
-        setState(() => _pageNumber = details.newPageNumber);
+        setState(() {
+          _pageNumber = details.newPageNumber;
+          _selectedText = null;
+          _selectedRegion = null;
+        });
         _scheduleProgressSave();
       },
       onAnnotationAdded: _onAnnotationAdded,
@@ -364,6 +375,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void _setTool(_Tool tool) {
     if (!_isLoaded) return;
     HapticFeedback.selectionClick();
+
+    // If text was selected with precision handles and the user taps Highlight/Underline/Strikethrough:
+    if (_selectedText != null && _selectedText!.trim().isNotEmpty) {
+      if (tool == _Tool.highlight) {
+        _highlightCurrentSelection();
+        return;
+      } else if (tool == _Tool.underline) {
+        _underlineCurrentSelection();
+        return;
+      } else if (tool == _Tool.strikethrough) {
+        _strikethroughCurrentSelection();
+        return;
+      }
+    }
+
     setState(() => _tool = tool);
     _controller.annotationMode = switch (tool) {
       _Tool.pan => PdfAnnotationMode.none,
@@ -391,6 +417,102 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   // ------------------------------------------------------------- selection
+
+  void _onTextSelectionChanged(PdfTextSelectionChangedDetails details) {
+    if (mounted) {
+      setState(() {
+        _selectedText = details.selectedText;
+        _selectedRegion = details.globalSelectedRegion;
+      });
+    }
+  }
+
+  void _highlightCurrentSelection() {
+    final lines = _pdfViewerStateKey.currentState?.getSelectedTextLines();
+    if (lines != null && lines.isNotEmpty) {
+      HapticFeedback.selectionClick();
+      final annotation = HighlightAnnotation(textBoundsCollection: lines)
+        ..color = _color;
+      _controller.addAnnotation(annotation);
+      _controller.clearSelection();
+      setState(() {
+        _selectedText = null;
+        _selectedRegion = null;
+      });
+    }
+  }
+
+  void _underlineCurrentSelection() {
+    final lines = _pdfViewerStateKey.currentState?.getSelectedTextLines();
+    if (lines != null && lines.isNotEmpty) {
+      HapticFeedback.selectionClick();
+      final annotation = UnderlineAnnotation(textBoundsCollection: lines)
+        ..color = _color;
+      _controller.addAnnotation(annotation);
+      _controller.clearSelection();
+      setState(() {
+        _selectedText = null;
+        _selectedRegion = null;
+      });
+    }
+  }
+
+  void _strikethroughCurrentSelection() {
+    final lines = _pdfViewerStateKey.currentState?.getSelectedTextLines();
+    if (lines != null && lines.isNotEmpty) {
+      HapticFeedback.selectionClick();
+      final annotation = StrikethroughAnnotation(textBoundsCollection: lines)
+        ..color = _color;
+      _controller.addAnnotation(annotation);
+      _controller.clearSelection();
+      setState(() {
+        _selectedText = null;
+        _selectedRegion = null;
+      });
+    }
+  }
+
+  void _askGeminiAboutSelection() {
+    final text = _selectedText;
+    if (text != null && text.trim().isNotEmpty) {
+      _controller.clearSelection();
+      setState(() {
+        _selectedText = null;
+        _selectedRegion = null;
+      });
+      GeminiShareService.askGeminiAboutText(
+        context: context,
+        selectedText: text,
+        pageTitle: '$_baseName (Page $_pageNumber)',
+      );
+    }
+  }
+
+  void _copySelection() {
+    final text = _selectedText;
+    if (text != null && text.trim().isNotEmpty) {
+      Clipboard.setData(ClipboardData(text: text));
+      _controller.clearSelection();
+      setState(() {
+        _selectedText = null;
+        _selectedRegion = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.copiedToClipboard),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _clearTextSelection() {
+    _controller.clearSelection();
+    setState(() {
+      _selectedText = null;
+      _selectedRegion = null;
+    });
+  }
 
   void _onAnnotationSelected(Annotation annotation) {
     if (mounted) setState(() => _selectedAnnotation = annotation);
@@ -973,9 +1095,181 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 ),
               ),
             ],
+            if (_selectedText != null && _selectedText!.trim().isNotEmpty)
+              _buildSelectionQuickBar(),
+            if (_tool == _Tool.highlight && !_immersive)
+              _buildHighlightTipBar(),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildSelectionQuickBar() {
+    final l10n = context.l10n;
+    final colorScheme = Theme.of(context).colorScheme;
+    final mediaQuery = MediaQuery.of(context);
+    final region = _selectedRegion;
+
+    double topPos = 16.0;
+    if (region != null) {
+      if (region.top > 130) {
+        topPos = (region.top - 62).clamp(16.0, mediaQuery.size.height - 180);
+      } else {
+        topPos = (region.bottom + 14).clamp(16.0, mediaQuery.size.height - 180);
+      }
+    }
+
+    return Positioned(
+      top: topPos,
+      left: 16,
+      right: 16,
+      child: Center(
+        child: Material(
+          elevation: 8,
+          shadowColor: Colors.black45,
+          color: colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(28),
+          clipBehavior: Clip.antiAlias,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      minimumSize: const Size(40, 36),
+                    ),
+                    icon: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: _color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: colorScheme.onSurface,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                    label: Text(
+                      l10n.toolHighlight,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    onPressed: _highlightCurrentSelection,
+                  ),
+                  const SizedBox(width: 2),
+                  IconButton(
+                    tooltip: l10n.toolUnderline,
+                    icon: const Icon(Icons.format_underlined_rounded, size: 20),
+                    onPressed: _underlineCurrentSelection,
+                  ),
+                  IconButton(
+                    tooltip: l10n.toolStrikethrough,
+                    icon: const Icon(Icons.format_strikethrough_rounded, size: 20),
+                    onPressed: _strikethroughCurrentSelection,
+                  ),
+                  IconButton(
+                    tooltip: l10n.askGemini,
+                    icon: Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 20,
+                      color: colorScheme.primary,
+                    ),
+                    onPressed: _askGeminiAboutSelection,
+                  ),
+                  IconButton(
+                    tooltip: MaterialLocalizations.of(context).copyButtonLabel,
+                    icon: const Icon(Icons.copy_rounded, size: 19),
+                    onPressed: _copySelection,
+                  ),
+                  IconButton(
+                    tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                    icon: const Icon(Icons.close_rounded, size: 19),
+                    onPressed: _clearTextSelection,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHighlightTipBar() {
+    final l10n = context.l10n;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Positioned(
+      top: 10,
+      left: 20,
+      right: 20,
+      child: Center(
+        child: Material(
+          elevation: 3,
+          color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.95),
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.touch_app_rounded,
+                  size: 18,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    l10n.precisionHighlightHint,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => _setTool(_Tool.pan),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    child: Text(
+                      l10n.toolReadPan,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

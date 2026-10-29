@@ -60,9 +60,12 @@ void main() {
   });
 
   group('AppLocalizations strings', () {
-    test('English strings', () {
-      const en = AppLocalizations.delegate;
-      expect(en.isSupported(const Locale('en')), isTrue);
+    test('English strings', () async {
+      final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+      expect(l10n.copiedToClipboard, 'Copied to clipboard');
+      expect(l10n.precisionHighlightHint, contains('precision handles'));
+      expect(l10n.geminiOpeningInBrowser, contains('Opening Gemini'));
+      expect(l10n.getGeminiApp, 'Get App');
     });
 
     test('French translations are complete and accurate', () async {
@@ -77,6 +80,10 @@ void main() {
       expect(l10n.recentFiles, 'FICHIERS RÉCENTS');
       expect(l10n.removeAds, 'Supprimer les publicités');
       expect(l10n.tableOfContents, 'Table des matières');
+      expect(l10n.copiedToClipboard, 'Copié dans le presse-papiers');
+      expect(l10n.precisionHighlightHint, contains('poignées'));
+      expect(l10n.geminiOpeningInBrowser, contains('navigateur'));
+      expect(l10n.getGeminiApp, "Obtenir l'app");
     });
 
     test('Arabic translations are complete and accurate', () async {
@@ -91,6 +98,10 @@ void main() {
       expect(l10n.recentFiles, 'الملفات الأخيرة');
       expect(l10n.removeAds, 'إزالة الإعلانات');
       expect(l10n.tableOfContents, 'جدول المحتويات');
+      expect(l10n.copiedToClipboard, 'تم النسخ إلى الحافظة');
+      expect(l10n.precisionHighlightHint, contains('المقابض'));
+      expect(l10n.geminiOpeningInBrowser, contains('Gemini'));
+      expect(l10n.getGeminiApp, 'تثبيت التطبيق');
     });
   });
 

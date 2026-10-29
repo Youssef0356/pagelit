@@ -535,80 +535,117 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
 
   Widget _buildCardContent(PresentationSlide slide, ColorScheme scheme, AppLocalizations l10n) {
     final cleanSlideTitle = EncodingUtils.cleanDisplayName(slide.title);
+    final totalSlides = _deck?.slides.length ?? 0;
+    final densityScale = slide.bulletPoints.length > 6
+        ? 0.88
+        : (slide.bulletPoints.length > 4 ? 0.94 : 1.0);
 
     return Container(
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.6),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.10),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(20),
+      clipBehavior: Clip.antiAlias,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _highlightedText(
-                  cleanSlideTitle,
-                  TextStyle(
-                    fontSize: 20 * _fontScale,
-                    fontWeight: FontWeight.bold,
-                    color: scheme.onSurface,
-                  ),
-                  scheme,
-                ),
+          // Presentation Brand Accent Top Bar
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  scheme.primary,
+                  scheme.tertiary,
+                ],
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  l10n.slideNumber(slide.slideNumber),
-                  style: TextStyle(
-                    fontSize: 11 * _fontScale,
-                    fontWeight: FontWeight.bold,
-                    color: scheme.outline,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-          const Divider(height: 24),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _highlightedText(
+                    cleanSlideTitle,
+                    TextStyle(
+                      fontSize: 20 * _fontScale,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.2,
+                      color: scheme.onSurface,
+                    ),
+                    scheme,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    totalSlides > 0
+                        ? '${slide.slideNumber} / $totalSlides'
+                        : l10n.slideNumber(slide.slideNumber),
+                    style: TextStyle(
+                      fontSize: 11 * _fontScale,
+                      fontWeight: FontWeight.bold,
+                      color: scheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(
+            height: 1,
+            color: scheme.outlineVariant.withValues(alpha: 0.5),
+          ),
           Expanded(
             child: SingleChildScrollView(
+              padding: const EdgeInsets.all(18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (final point in slide.bulletPoints) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerLow.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: scheme.outlineVariant.withValues(alpha: 0.35),
+                        ),
+                      ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Padding(
-                            padding: const EdgeInsetsDirectional.only(end: 10, top: 4),
-                            child: Transform.flip(
-                              flipX: Directionality.of(context) == TextDirection.rtl,
-                              child: Icon(Icons.arrow_right_rounded, size: 20, color: scheme.primary),
+                            padding: const EdgeInsetsDirectional.only(end: 10, top: 3),
+                            child: Icon(
+                              Icons.arrow_right_rounded,
+                              size: 22,
+                              color: scheme.primary,
                             ),
                           ),
                           Expanded(
                             child: _highlightedText(
                               point,
                               TextStyle(
-                                fontSize: 14.5 * _fontScale,
+                                fontSize: 14.5 * _fontScale * densityScale,
                                 height: 1.55,
                                 color: scheme.onSurface,
                               ),
@@ -621,7 +658,7 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
                   ],
                   if (slide.bulletPoints.isEmpty && slide.images.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      padding: const EdgeInsets.symmetric(vertical: 36),
                       child: Center(
                         child: Text(
                           l10n.slideTitleOnly,
@@ -634,18 +671,24 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
                       ),
                     ),
                   if (slide.images.isNotEmpty) ...[
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     Wrap(
                       spacing: 12,
                       runSpacing: 12,
                       children: slide.images.map((img) {
                         return InkWell(
                           onTap: () => _viewImage(img),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
                             child: Container(
-                              color: scheme.surfaceContainerHigh,
+                              decoration: BoxDecoration(
+                                color: scheme.surfaceContainerHigh,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: scheme.outlineVariant.withValues(alpha: 0.5),
+                                ),
+                              ),
                               child: Stack(
                                 alignment: Alignment.bottomRight,
                                 children: [
@@ -656,11 +699,11 @@ class _PresentationViewerScreenState extends State<PresentationViewerScreen> {
                                     errorBuilder: (_, _, _) => const SizedBox.shrink(),
                                   ),
                                   Container(
-                                    margin: const EdgeInsets.all(6),
-                                    padding: const EdgeInsets.all(4),
+                                    margin: const EdgeInsets.all(8),
+                                    padding: const EdgeInsets.all(5),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: 0.6),
-                                      borderRadius: BorderRadius.circular(6),
+                                      color: Colors.black.withValues(alpha: 0.65),
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: const Icon(
                                       Icons.zoom_in_rounded,
