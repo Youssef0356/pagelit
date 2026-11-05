@@ -1,4 +1,4 @@
-﻿# Pagelit website (GitHub Pages)
+# Pagelit website (GitHub Pages)
 
 Static site living in the docs/ folder so it can be deployed directly
 from this repository with no extra build step.
@@ -9,7 +9,7 @@ from this repository with no extra build step.
 3. Source: "Deploy from a branch".
 4. Branch: main → folder /docs.
 5. Save. Your site will be live at:
-   https://<your-username>.github.io/pagelit/
+   https://youssef0356.github.io/pagelit/
 
 All internal links are relative (no leading slash), so the site works at any
 base path — root domain OR project folder — without configuration changes.

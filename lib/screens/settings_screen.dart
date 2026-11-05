@@ -15,7 +15,7 @@ import '../services/recent_files.dart';
 import '../services/theme_prefs.dart';
 
 /// Published GitHub Pages site (see docs/README.md).
-const _privacyUrl = 'https://the356company.github.io/pagelit/privacy.html';
+const _privacyUrl = 'https://youssef0356.github.io/pagelit/privacy.html';
 
 /// App settings: appearance, language, reading behaviour, annotation defaults,
 /// stored data and about info. Everything here is also reachable from the reader.
