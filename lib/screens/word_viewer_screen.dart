@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import '../services/encoding_utils.dart';
@@ -10,7 +12,6 @@ import '../services/gallery_saver.dart';
 import '../services/gemini_share_service.dart';
 import '../services/reading_prefs.dart';
 import '../services/word_parser.dart';
-
 
 class WordViewerScreen extends StatefulWidget {
   const WordViewerScreen({
@@ -29,6 +30,7 @@ class WordViewerScreen extends StatefulWidget {
 class _WordViewerScreenState extends State<WordViewerScreen> {
   final GlobalKey _documentViewKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
+  final Map<String, TapGestureRecognizer> _linkRecognizers = {};
   WordDocument? _doc;
   bool _isLoading = true;
   bool _isSavingToGallery = false;
@@ -46,9 +48,38 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
 
   @override
   void dispose() {
+    for (final rec in _linkRecognizers.values) {
+      rec.dispose();
+    }
+    _linkRecognizers.clear();
     _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  TapGestureRecognizer _recognizerForUrl(String url) {
+    return _linkRecognizers.putIfAbsent(url, () {
+      return TapGestureRecognizer()..onTap = () => _openLink(url);
+    });
+  }
+
+  Future<void> _openLink(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open link: $url')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Invalid link URL: $url')),
+        );
+      }
+    }
   }
 
   Future<void> _loadFile() async {
@@ -206,6 +237,72 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
         ),
       ),
     );
+  }
+
+  Color? _parseColor(String? hexStr) {
+    if (hexStr == null || hexStr.isEmpty || hexStr.toLowerCase() == 'auto' || hexStr.toLowerCase() == 'none') {
+      return null;
+    }
+    final clean = hexStr.replaceAll('#', '');
+    if (clean.length == 6) {
+      final val = int.tryParse(clean, radix: 16);
+      if (val != null) return Color(0xFF000000 | val);
+    } else if (clean.length == 8) {
+      final val = int.tryParse(clean, radix: 16);
+      if (val != null) return Color(val);
+    }
+    return null;
+  }
+
+  Color? _getHighlightColor(String? nameOrHex) {
+    if (nameOrHex == null || nameOrHex.isEmpty || nameOrHex.toLowerCase() == 'none') return null;
+    final lower = nameOrHex.toLowerCase();
+    switch (lower) {
+      case 'yellow':
+        return const Color(0xFFFFF275).withValues(alpha: 0.85);
+      case 'green':
+        return const Color(0xFF8CE99A).withValues(alpha: 0.85);
+      case 'cyan':
+        return const Color(0xFF66D9E8).withValues(alpha: 0.85);
+      case 'magenta':
+        return const Color(0xFFF783AC).withValues(alpha: 0.85);
+      case 'blue':
+        return const Color(0xFF74C0FC).withValues(alpha: 0.85);
+      case 'red':
+        return const Color(0xFFFF8787).withValues(alpha: 0.85);
+      case 'darkblue':
+        return const Color(0xFF1971C2).withValues(alpha: 0.35);
+      case 'darkcyan':
+        return const Color(0xFF0C8599).withValues(alpha: 0.35);
+      case 'darkgreen':
+        return const Color(0xFF2F9E44).withValues(alpha: 0.35);
+      case 'darkmagenta':
+        return const Color(0xFFA61E4D).withValues(alpha: 0.35);
+      case 'darkred':
+        return const Color(0xFFC92A2A).withValues(alpha: 0.35);
+      case 'darkyellow':
+        return const Color(0xFFF59F00).withValues(alpha: 0.45);
+      case 'darkgray':
+        return const Color(0xFF495057).withValues(alpha: 0.35);
+      case 'lightgray':
+        return const Color(0xFFCED4DA).withValues(alpha: 0.8);
+      case 'black':
+        return Colors.black26;
+      default:
+        final clean = lower.replaceAll('#', '');
+        final hex = int.tryParse(clean, radix: 16);
+        if (hex != null) return Color(0xFF000000 | hex);
+        return const Color(0xFFFFF275);
+    }
+  }
+
+  TextDecoration _resolveDecoration(bool underline, bool strikethrough) {
+    if (underline && strikethrough) {
+      return TextDecoration.combine([TextDecoration.underline, TextDecoration.lineThrough]);
+    }
+    if (underline) return TextDecoration.underline;
+    if (strikethrough) return TextDecoration.lineThrough;
+    return TextDecoration.none;
   }
 
   @override
@@ -437,7 +534,7 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
                     itemCount: _doc!.blocks.length,
                     itemBuilder: (context, index) {
                       final block = _doc!.blocks[index];
-                      return _buildBlock(block, textColor, scheme);
+                      return _buildBlock(block, textColor, scheme, comfort);
                     },
                   ),
                 ),
@@ -449,25 +546,31 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
     );
   }
 
-  Widget _buildBlock(WordBlock block, Color textColor, ColorScheme scheme) {
+  Widget _buildBlock(WordBlock block, Color textColor, ColorScheme scheme, ComfortMode comfort) {
     if (block is WordParagraph) {
-      if (block.headingLevel != null) {
-        final double fontSize = switch (block.headingLevel) {
-          1 => 24.0 * _fontScale,
-          2 => 20.0 * _fontScale,
-          _ => 17.0 * _fontScale,
-        };
-        final isH1 = block.headingLevel == 1;
+      final align = block.alignment ?? TextAlign.start;
 
-        return Padding(
+      if (block.headingLevel != null) {
+        final double baseSize = switch (block.headingLevel) {
+          1 => 24.0,
+          2 => 20.0,
+          _ => 17.0,
+        };
+        final double fontSize = (block.spans.firstOrNull?.fontSize ?? baseSize) * _fontScale;
+        final isH1 = block.headingLevel == 1;
+        final hasCenterOrRight = align == TextAlign.center || align == TextAlign.right;
+
+        Widget headingWidget = Padding(
           padding: EdgeInsets.only(top: isH1 ? 24 : 16, bottom: 8),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: align == TextAlign.center
+                ? CrossAxisAlignment.center
+                : (align == TextAlign.right ? CrossAxisAlignment.end : CrossAxisAlignment.start),
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  if (isH1)
+                  if (isH1 && !hasCenterOrRight)
                     Container(
                       width: 4,
                       height: 22 * _fontScale,
@@ -480,11 +583,12 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
                   Expanded(
                     child: Text(
                       block.fullText,
+                      textAlign: align,
                       style: TextStyle(
                         fontSize: fontSize,
                         fontWeight: FontWeight.bold,
                         letterSpacing: isH1 ? -0.3 : -0.1,
-                        color: textColor,
+                        color: _parseColor(block.spans.firstOrNull?.colorHex) ?? textColor,
                       ),
                     ),
                   ),
@@ -500,10 +604,37 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
             ],
           ),
         );
+
+        if (block.backgroundColorHex != null) {
+          final calloutBg = _parseColor(block.backgroundColorHex);
+          if (calloutBg != null) {
+            headingWidget = Container(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: (comfort == ComfortMode.dim || comfort == ComfortMode.inverted)
+                    ? calloutBg.withValues(alpha: 0.25)
+                    : calloutBg.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: scheme.outlineVariant.withValues(alpha: 0.4),
+                  width: 0.8,
+                ),
+              ),
+              child: headingWidget,
+            );
+          }
+        }
+
+        return headingWidget;
       }
 
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+      Widget paragraphWidget = Padding(
+        padding: EdgeInsetsDirectional.only(
+          start: ((block.indent ?? 0.0) * _fontScale).clamp(0.0, 80.0),
+          top: 4,
+          bottom: 4,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -527,26 +658,73 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
                       if (hex != null) spanColor = Color(0xFF000000 | hex);
                     }
 
+                    final isLink = span.linkUrl != null;
+                    final effectiveColor = isMatch
+                        ? Colors.black
+                        : (isLink
+                            ? (spanColor != textColor ? spanColor : Colors.blue.shade700)
+                            : spanColor);
+
+                    final effectiveDecoration = _resolveDecoration(
+                      span.underline || isLink,
+                      span.strikethrough,
+                    );
+
+                    final effectiveBg = isMatch
+                        ? Colors.yellow
+                        : _getHighlightColor(span.highlightHex);
+
+                    final double effectiveFontSize = (span.fontSize ?? 15.0) * _fontScale;
+
                     return TextSpan(
                       text: span.text,
+                      recognizer: isLink ? _recognizerForUrl(span.linkUrl!) : null,
+                      mouseCursor: isLink ? SystemMouseCursors.click : SystemMouseCursors.text,
                       style: TextStyle(
-                        fontSize: 15.0 * _fontScale,
+                        fontSize: effectiveFontSize,
                         height: 1.6,
                         fontWeight: span.bold ? FontWeight.bold : FontWeight.normal,
                         fontStyle: span.italic ? FontStyle.italic : FontStyle.normal,
-                        decoration: span.underline ? TextDecoration.underline : TextDecoration.none,
-                        color: isMatch ? Colors.black : spanColor,
-                        backgroundColor: isMatch ? Colors.yellow : null,
+                        decoration: effectiveDecoration,
+                        color: effectiveColor,
+                        backgroundColor: effectiveBg,
+                        fontFamily: span.fontFamily,
                       ),
                     );
                   }).toList(),
                 ),
+                textAlign: align,
               ),
             ),
           ],
         ),
       );
+
+      if (block.backgroundColorHex != null) {
+        final calloutBg = _parseColor(block.backgroundColorHex);
+        if (calloutBg != null) {
+          paragraphWidget = Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: (comfort == ComfortMode.dim || comfort == ComfortMode.inverted)
+                  ? calloutBg.withValues(alpha: 0.25)
+                  : calloutBg.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: 0.4),
+                width: 0.8,
+              ),
+            ),
+            child: paragraphWidget,
+          );
+        }
+      }
+
+      return paragraphWidget;
     } else if (block is WordTableBlock) {
+      final richRows = block.richCells;
+
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 14),
         child: Container(
@@ -579,30 +757,72 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
                   width: 0.8,
                 ),
               ),
-              children: block.rows.asMap().entries.map((entry) {
-                final isHeader = entry.key == 0;
-                final isEvenRow = entry.key % 2 == 0;
-                final rowBg = isHeader
-                    ? scheme.surfaceContainerHigh
-                    : (isEvenRow ? scheme.surface : scheme.surfaceContainerLowest);
+              children: (richRows != null && richRows.isNotEmpty)
+                  ? richRows.asMap().entries.map((entry) {
+                      final rowIndex = entry.key;
+                      final rowCells = entry.value;
+                      final isFirstRow = rowIndex == 0;
+                      final isEvenRow = rowIndex % 2 == 0;
+                      final defaultRowBg = isFirstRow
+                          ? scheme.surfaceContainerHigh
+                          : (isEvenRow ? scheme.surface : scheme.surfaceContainerLowest);
 
-                return TableRow(
-                  decoration: BoxDecoration(color: rowBg),
-                  children: entry.value.map((cellText) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      child: Text(
-                        cellText,
-                        style: TextStyle(
-                          fontSize: 13.0 * _fontScale,
-                          fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
-                          color: textColor,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                );
-              }).toList(),
+                      return TableRow(
+                        decoration: BoxDecoration(color: defaultRowBg),
+                        children: rowCells.map((cell) {
+                          final isHeader = isFirstRow || cell.isHeader;
+                          final cellCustomBg = _parseColor(cell.backgroundColorHex);
+
+                          Widget cellWidget = Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            child: Text(
+                              cell.text,
+                              textAlign: cell.alignment ?? (isHeader ? TextAlign.center : TextAlign.start),
+                              style: TextStyle(
+                                fontSize: 13.0 * _fontScale,
+                                fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
+                                color: textColor,
+                              ),
+                            ),
+                          );
+
+                          if (cellCustomBg != null) {
+                            cellWidget = Container(
+                              color: (comfort == ComfortMode.dim || comfort == ComfortMode.inverted)
+                                  ? cellCustomBg.withValues(alpha: 0.3)
+                                  : cellCustomBg.withValues(alpha: 0.8),
+                              child: cellWidget,
+                            );
+                          }
+
+                          return cellWidget;
+                        }).toList(),
+                      );
+                    }).toList()
+                  : block.rows.asMap().entries.map((entry) {
+                      final isHeader = entry.key == 0;
+                      final isEvenRow = entry.key % 2 == 0;
+                      final rowBg = isHeader
+                          ? scheme.surfaceContainerHigh
+                          : (isEvenRow ? scheme.surface : scheme.surfaceContainerLowest);
+
+                      return TableRow(
+                        decoration: BoxDecoration(color: rowBg),
+                        children: entry.value.map((cellText) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            child: Text(
+                              cellText,
+                              style: TextStyle(
+                                fontSize: 13.0 * _fontScale,
+                                fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
+                                color: textColor,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    }).toList(),
             ),
           ),
         ),
@@ -658,4 +878,3 @@ class _WordViewerScreenState extends State<WordViewerScreen> {
     return const SizedBox.shrink();
   }
 }
-

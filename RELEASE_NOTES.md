@@ -1,3 +1,37 @@
+# Pagelit Release Notes — v1.3.2 (Build 8)
+
+---
+
+## 🇬🇧 English
+
+### What's New in v1.3.2
+* **Authentic PowerPoint Visual Presentation Rendering**: Native slide canvas rendering preserving original layout, aspect ratios (16:9 widescreen and 4:3 standard), custom theme colors, transforms, and shape positioning on mobile screens.
+* **PowerPoint Slideshow & Transitions**: Staggered slide element entrance animations, interactive pinch-to-zoom (1.0x - 5.0x) with quick reset, and a full-screen Diaporama slideshow mode with slide-to-slide transitions.
+* **Enhanced Word (.docx) Document Styling**: Full support for text alignments (center, right, justify), clickable hyperlinks opening in external browser, custom font sizes, strikethrough decorations, and text highlighter colors.
+* **Callout Boxes & Rich Tables in Word**: Word paragraph background shading rendered as soft rounded callout containers, and enriched table cell alignments and shading.
+
+---
+
+## 🇫🇷 Français
+
+### Nouveautés de la version 1.3.2
+* **Rendu visuel authentique des présentations PowerPoint** : Affichage fidèle des diapositives préservant la mise en page d'origine, les ratios d'aspect (16:9 et 4:3), les couleurs de thème, et la disposition géométrique sur mobile.
+* **Mode Diaporama et animations PowerPoint** : Animations d'entrée échelonnées des éléments de diapositive, zoom tactile interactif (1.0x à 5.0x) avec bouton de réinitialisation, et mode diaporama plein écran avec transitions.
+* **Style enrichi pour les documents Word (.docx)** : Prise en charge complète de l'alignement du texte (centré, justifié, à droite), hyperliens cliquables avec ouverture dans le navigateur, tailles de police fidèles, texte barré et surlignages colorés.
+* **Encadrés d'avertissement et tableaux riches dans Word** : Trames de fond de paragraphes affichées sous forme d'encadrés arrondis élégants, et prise en charge des couleurs et alignements par cellule dans les tableaux.
+
+---
+
+## 🇸🇦 العربية
+
+### الجديد في الإصدار 1.3.2
+* **عرض مرئي أصيل لعروض PowerPoint التقديمية**: محاكاة دقيقة وحقيقية لتصميم الشرائح وأبعادها (16:9 و 4:3)، مع الحفاظ على ألوان السمة والمواقع والتنسيقات الهندسية للأشكال والصور على شاشات الهواتف.
+* **وضع عرض الشرائح والانتقالات التفاعلية**: حركات دخول متدرجة لعناصر الشرائح، تكبير وتصغير تفاعلي باللمس (1.0x - 5.0x) مع زر إعادة التعيين، ووضع ملء الشاشة لعرض الشرائح مع تأثيرات انتقال سلسة.
+* **تنسيق متقدم لمستندات Word (.docx)**: دعم كامل لمحاذاة النصوص (توسيط، ضبط، محاذاة لليمين واليسار)، روابط تشعبية قابلة للنقر تفتح في المتصفح، أحجام خطوط دقيقة، خطوط الشطب، وألوان التمييز المتعددة.
+* **صناديق التظليل والجداول المتقدمة في Word**: تحويل تظليل الفقرات إلى بطاقات منسقة ذات حواف مستديرة، ودعم ألوان الخلفية والمحاذاة المخصصة لكل خلية في الجداول.
+
+---
+
 # Pagelit Release Notes — v1.3.1 (Build 7)
 
 ---

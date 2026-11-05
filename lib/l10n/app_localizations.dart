@@ -232,6 +232,14 @@ abstract class AppLocalizations {
   String get imageSavedToGallery;
   String get aspectRatioMode;
   String get expandedBigContainer;
+  String get slidePresentationMode;
+  String get slideOutlineMode;
+  String get playSlideshow;
+  String get exitSlideshow;
+  String get autoPlay;
+  String get slideAnimations;
+  String get resetZoom;
+  String get pinchToZoomHint;
   String get searchPresentationHint;
   String get presentationHasNoSlides;
 
@@ -715,6 +723,22 @@ class _AppLocalizationsEn extends AppLocalizations {
   String get aspectRatioMode => "Aspect ratio mode (16:9)";
   @override
   String get expandedBigContainer => "Expanded big container";
+  @override
+  String get slidePresentationMode => "Slide View";
+  @override
+  String get slideOutlineMode => "Outline View";
+  @override
+  String get playSlideshow => "Play Slideshow";
+  @override
+  String get exitSlideshow => "Exit Slideshow";
+  @override
+  String get autoPlay => "Auto-play";
+  @override
+  String get slideAnimations => "Animations";
+  @override
+  String get resetZoom => "Reset Zoom";
+  @override
+  String get pinchToZoomHint => "Pinch or double-tap to zoom";
   @override
   String get searchPresentationHint =>
       "Search slide text (diacritic-friendly)...";
@@ -1219,6 +1243,22 @@ class _AppLocalizationsFr extends AppLocalizations {
   @override
   String get expandedBigContainer => "Mode plein écran agrandi";
   @override
+  String get slidePresentationMode => "Vue Diapositives";
+  @override
+  String get slideOutlineMode => "Vue Plan";
+  @override
+  String get playSlideshow => "Lancer le diaporama";
+  @override
+  String get exitSlideshow => "Quitter le diaporama";
+  @override
+  String get autoPlay => "Lecture automatique";
+  @override
+  String get slideAnimations => "Animations";
+  @override
+  String get resetZoom => "Réinitialiser le zoom";
+  @override
+  String get pinchToZoomHint => "Pincez ou touchez deux fois pour zoomer";
+  @override
   String get searchPresentationHint =>
       "Rechercher dans la diapositive…";
   @override
@@ -1716,6 +1756,22 @@ class _AppLocalizationsAr extends AppLocalizations {
   String get aspectRatioMode => "وضع نسبة العرض (16:9)";
   @override
   String get expandedBigContainer => "وضع الحجم الكامل";
+  @override
+  String get slidePresentationMode => "عرض الشرائح";
+  @override
+  String get slideOutlineMode => "عرض المخطط";
+  @override
+  String get playSlideshow => "بدء العرض التقديمي";
+  @override
+  String get exitSlideshow => "إنهاء العرض التقديمي";
+  @override
+  String get autoPlay => "تشغيل تلقائي";
+  @override
+  String get slideAnimations => "التأثيرات الحركية";
+  @override
+  String get resetZoom => "إعادة ضبط التكبير";
+  @override
+  String get pinchToZoomHint => "قرص أو انقر نقراً مزدوجاً للتكبير";
   @override
   String get searchPresentationHint => "البحث في نص الشرائح...";
   @override
